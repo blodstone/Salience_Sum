@@ -83,9 +83,9 @@ def run(max_words, window, src_path):
 
 
 if __name__ == '__main__':
-    src = "Compatibility of systems of linear constraints over the set of natural numbers. Criteria of compatibility of a system of linear Diophantine equations, strict inequations, and nonstrict inequations are considered. Upper bounds for components of a minimal set of solutions and algorithms of construction of minimal generating sets of solutions for all types of systems are given. These criteria and the corresponding algorithms for constructing a minimal supporting set of solutions can be used in solving all the considered types systems and systems of mixed types."
+    src_path = '../sample_data/train_src.pickle'
     max_words = 22
     window = 2
-    result_labels = run(max_words, window, src.split('\n'))
+    result_labels = run(max_words, window, src_path)
     assert len(result_labels[0]) == 91
     print(result_labels)
