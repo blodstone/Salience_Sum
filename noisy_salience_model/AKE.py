@@ -1,9 +1,11 @@
+'''
+Automated Keyword Retrieval using Textrank
+'''
+import pickle
 from collections import namedtuple
 
 import spacy
 import networkx as nx
-import matplotlib.pyplot as plt
-from pyvis.network import Network
 
 Labeled_Word = namedtuple('Labeled_Word', ['word', 'label', 'idx', 'sent_idx', 'score'])
 desired_pos = ['NOUN', 'ADJ']
@@ -29,10 +31,12 @@ def create_labeled_doc(doc) -> list:
     return result
 
 
-def run(max_words, window, src):
+def run(max_words, window, src_path):
     nlp = spacy.load('en_core_web_sm')
+    docs = pickle.load(open(src_path, 'rb'))
+    result_labels = []
     # Split and create initial label
-    labeled_docs = [create_labeled_doc(doc) for doc in list(nlp.pipe(src))]
+    labeled_docs = [create_labeled_doc(doc) for doc in docs]
     for labeled_doc in labeled_docs:
         # Build graph
         graph = nx.Graph()
@@ -55,10 +59,9 @@ def run(max_words, window, src):
                     graph.add_edge(labeled_doc[i].word, labeled_doc[j].word, weight=1.0)
                 j += 1
                 window_taken += 1
-        g = Network(height=800, width=800)
-        g.from_nx(graph)
-        g.show('graph.html')
-        # nx.draw_networkx(graph, pos=nx.spring_layout(graph))
+        # g = Network(height=800, width=800)
+        # g.from_nx(graph)
+        # g.show('graph.html')
         # Retrieve top N keywords
         ranks = nx.pagerank(graph)
         top_n_ranks = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True)[:max_words])
@@ -74,24 +77,15 @@ def run(max_words, window, src):
                                               labeled_doc[i].idx, labeled_doc[i].sent_idx,
                                               -1)
             i += 1
-    return labeled_docs
+        # Output result
+        result_labels.append([labeled_word.label for labeled_word in labeled_doc])
+    return result_labels
 
 
 if __name__ == '__main__':
     src = "Compatibility of systems of linear constraints over the set of natural numbers. Criteria of compatibility of a system of linear Diophantine equations, strict inequations, and nonstrict inequations are considered. Upper bounds for components of a minimal set of solutions and algorithms of construction of minimal generating sets of solutions for all types of systems are given. These criteria and the corresponding algorithms for constructing a minimal supporting set of solutions can be used in solving all the considered types systems and systems of mixed types."
     max_words = 22
     window = 2
-    labeled_docs = run(max_words, window, src.split('\n'))
-    for doc in labeled_docs:
-        i = 1
-        print('Words that are labeled as 1.')
-        for word in doc:
-            if word.label == 1:
-                print('{}:{}'.format(i, word))
-                i += 1
-        i = 1
-        print('Words that are labeled as 0.')
-        for word in doc:
-            if word.label == 0:
-                print('{}:{}'.format(i, word))
-                i += 1
+    result_labels = run(max_words, window, src.split('\n'))
+    assert len(result_labels[0]) == 91
+    print(result_labels)
