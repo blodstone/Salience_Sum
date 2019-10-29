@@ -9,7 +9,16 @@ def filter_words(doc):
     return result
 
 
+def parse_graf():
+    pass
+
+
+def build_graph(words, window):
+    parse_graf()
+
+
 def run(max_words, src):
     nlp = spacy.load('en_core_web_sm')
     docs = [filter_words(doc) for doc in list(nlp.pipe(src))]
-    
+    for doc in docs:
+        build_graph(doc)
