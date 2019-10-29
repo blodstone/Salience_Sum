@@ -1,5 +1,5 @@
 import argparse
-from noisy_salience_model import AKE
+from noisy_salience_model import AKE, NER
 
 
 def main(args):
@@ -9,6 +9,8 @@ def main(args):
     if args.AKE:
         window = args.window
         results['AKE'] = AKE.run(max_words, window, src_path)
+    if args.NER:
+        results['NER'] = NER.run(max_words, src_path)
     print(results)
 
 
