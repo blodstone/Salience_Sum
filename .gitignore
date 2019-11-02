@@ -198,3 +198,6 @@ dmypy.json
 
 # Pickle output
 *.pickle
+
+# Matplotlib output
+*.png

@@ -8,7 +8,6 @@ import spacy
 
 
 def run(max_words, src_path):
-    nlp = spacy.load('en_core_web_sm')
     docs = pickle.load(open(src_path, 'rb'))
     result_labels = []
     for doc in docs:

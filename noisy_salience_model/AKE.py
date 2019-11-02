@@ -32,7 +32,6 @@ def create_labeled_doc(doc) -> list:
 
 
 def run(max_words, window, src_path):
-    nlp = spacy.load('en_core_web_sm')
     docs = pickle.load(open(src_path, 'rb'))
     result_labels = []
     # Split and create initial label

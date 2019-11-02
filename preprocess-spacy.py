@@ -5,11 +5,17 @@ import os
 import spacy
 
 
-def main():
-    src_data = open(args.src).readlines()
-    output_file = open(os.path.join(args.output, 'train_src.pickle'), 'wb')
+def preprocess(filename, name):
+    src_data = open(filename).readlines()
+    output_file = open(os.path.join(args.output, name+'.pickle'), 'wb')
     docs = list(nlp.pipe(src_data))
     pickle.dump(docs, output_file)
+    output_file.close()
+
+
+def main():
+    # preprocess(args.src, 'train_src')
+    preprocess(args.tgt, 'textrank_train_tgt')
 
 
 if __name__ == '__main__':
