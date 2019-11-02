@@ -27,3 +27,22 @@ The process will generate labeled source files using `||` separator as follows.
 token1||salience1 token2||salience2
 ```
 
+## Current preprocess setting (for development purpose)
+Extract from raw data into data suitable for PKUSUMSUM
+```bash
+python noisy_salience_model/preprocess_submodular.py
+```
+The noisy models are using the unsupervised models by PKUSUMSUM system. There are three that are in used: textrank, centroid and submodular. 
+
+Run the PKUSUMSUM system first and generate each of the model summary into their respective folder.Then run a script for preprocessing the result into a text file. The doc path is fixed (with exception of the system's summ path) but the output path has to be manually changed for each system. This is for temporary measure only.
+```bash
+python special_preprocess.py
+```
+Convert all the documents and summaries to spacy object. For each PKUSUMSUM output, we have to change to it respective output.
+```bash
+python preprocess-spacy.py -tgt sample_data/textrank_train_tgt.txt -output sample_data
+```
+
+```bash
+python preprocess-salience.py -src sample_data/train_src.pickle --AKE --submodular -submodular_tgt sample_data/submodular_train_tgt.pickle --centroid -centroid_tgt sample_data/centroid_train_tgt.pickle --textrank -textrank_tgt sample_data/textrank_train_tgt.pickle --NER -max_words 30 --gold -highlight sample_data/df_gold.pickle -doc_id sample_data/doc_id.txt
+```
