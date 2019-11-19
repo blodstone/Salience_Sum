@@ -3,6 +3,7 @@ import pickle
 import os
 
 import spacy
+from allennlp.common import Tqdm
 
 
 def preprocess(filename, name):
@@ -11,15 +12,12 @@ def preprocess(filename, name):
     with open(filename) as file:
         docs = []
         summs = []
-        index = 0
-        for line in file:
-            print(index)
-            index += 1
+        for line in Tqdm.tqdm(file):
             doc, summ = line.strip().split('\t')
-            docs.append(doc)
-            summs.append(summ)
-        docs_spacy = list(nlp.pipe(docs))
-        summs_spacy = list(nlp.pipe(summs))
+            docs.append(nlp(doc))
+            summs.append(nlp(summ))
+        docs_spacy = docs
+        summs_spacy = summs
         dataset = {
             'docs': docs_spacy,
             'summs': summs_spacy
@@ -41,3 +39,4 @@ if __name__ == '__main__':
     parser.add_argument('-name', help='Output name.')
     args = parser.parse_args()
     main()
+

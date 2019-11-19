@@ -25,7 +25,7 @@ class SummDataReader(DatasetReader):
         with open(file_path) as file:
             for line in file:
                 src_tagged_seq, tgt_seq = line.split('\t')
-                src_seq, salience_seq = zip(*[group.split('###') for group in src_tagged_seq.split()])
+                src_seq, salience_seq = zip(*[group.split('|#|') for group in src_tagged_seq.split()])
                 yield self.text_to_instance(' '.join(src_seq), tgt_seq, [float(value) for value in salience_seq])
 
     def smooth_and_norm_probs(self, prob):

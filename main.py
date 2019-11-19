@@ -63,7 +63,7 @@ if __name__ == '__main__':
     Setup Trainer
     """
     optimizer = optim.Adam(model.parameters(), lr=0.1)
-    iterator = BucketIterator(batch_size=4, sorting_keys=[("source_tokens", "num_tokens")])
+    iterator = BucketIterator(batch_size=8, sorting_keys=[("source_tokens", "num_tokens")])
     iterator.index_with(vocab)
     if torch.cuda.is_available():
         cuda_device = 0
