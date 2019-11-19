@@ -46,3 +46,20 @@ python preprocess-spacy.py -tgt sample_data/textrank_train_tgt.txt -output sampl
 ```bash
 python preprocess-salience.py -src sample_data/train_src.pickle --AKE --submodular -submodular_tgt sample_data/submodular_train_tgt.pickle --centroid -centroid_tgt sample_data/centroid_train_tgt.pickle --textrank -textrank_tgt sample_data/textrank_train_tgt.pickle --NER -max_words 30 --gold -highlight sample_data/df_gold.pickle -doc_id sample_data/doc_id.txt
 ```
+
+# Salience AutoEncoder
+
+Replace manually the file name inside the preprocessing.
+```bash
+python preprocess/preprocessing.py
+```
+
+Create a smaller one for dev.
+```bash
+cat data/bbc/train.tsv | awk 'NR%200==1' > data/dev_bbc/train.dev.tsv
+cat data/bbc/val.tsv | awk 'NR%100==1' > data/dev_bbc/val.dev.tsv
+```
+
+```bash
+python preprocess/add_noisy_dummy.pu
+```
