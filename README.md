@@ -18,7 +18,7 @@ There's another separate set of test data that
 To generate an unsupervised noisy salience, we process all set of source files.
 
 ```bash
-python preprocess-noisy.py -input <path_to_source_folder> --submodular --NER --textrank --compression -max-words 30
+python preprocess-salience.py -input <path_to_source_folder> --submodular --NER --textrank --compression -max-words 30
 ```
 
 The process will generate labeled source files using `||` separator as follows.

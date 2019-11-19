@@ -25,13 +25,13 @@ if __name__ == '__main__':
     """
     logging.basicConfig(level=logging.INFO)
     EMBEDDING_DIM = 128
-    HIDDEN_DIM = 64
-
+    HIDDEN_DIM = 512
+    MAX_SOURCE = 400
     """
     Setup Reader and Vocab
     """
     tokenizer = WordTokenizer(JustSpacesWordSplitter())
-    reader = SummDataReader(tokenizer, source_max_tokens=400, lazy=False)
+    reader = SummDataReader(tokenizer, source_max_tokens=MAX_SOURCE, lazy=False)
     train_dataset = reader.read('data/dev_bbc/train.dev.tsv.tagged')
     val_dataset = reader.read('data/dev_bbc/val.dev.tsv.tagged')
     vocab_path = 'data/dev_bbc/vocab'
@@ -54,7 +54,7 @@ if __name__ == '__main__':
                          use_bridge=True))
     decoder_net = LstmCellDecoderNet(decoding_dim=HIDDEN_DIM, target_embedding_dim=EMBEDDING_DIM)
     decoder = AutoRegressiveSeqDecoder(
-        max_decoding_steps=100, target_namespace='tokens',
+        max_decoding_steps=MAX_SOURCE, target_namespace='tokens',
         target_embedder=embedding, beam_size=5, decoder_net=decoder_net, vocab=vocab)
     noisy_prediction = NoisyPredictionModel(vocab=vocab, hidden_dim=HIDDEN_DIM)
     model = SalienceSeq2Seq(noisy_prediction=noisy_prediction, encoder=encoder, decoder=decoder, vocab=vocab, source_text_embedder=embedder)
@@ -70,6 +70,8 @@ if __name__ == '__main__':
         model = model.cuda(cuda_device)
     else:
         cuda_device = -1
-    trainer = Trainer(model=model, optimizer=optimizer, train_dataset=train_dataset,
-                      validation_dataset=val_dataset, iterator=iterator, num_epochs=2, cuda_device=cuda_device)
+    trainer = Trainer(model=model, optimizer=optimizer, train_dataset=train_dataset, patience=5,
+                      validation_dataset=val_dataset, iterator=iterator, num_epochs=50, cuda_device=cuda_device)
     trainer.train()
+    with open('data', 'wb') as f:
+        torch.save(model.state_dict(), f)
