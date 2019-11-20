@@ -53,8 +53,11 @@ class NoisyPredictionModel(Model):
         for idx, alpha in enumerate(alphas):
             predicted_salience = torch.Tensor(d_sample(alpha[:seq_len[idx]]))
             loss.append(self._get_loss(predicted_salience, salience_values[idx][:seq_len[idx]]))
+        loss = torch.stack(loss).mean()
+        if torch.isnan(loss):
+            raise ValueError("nan loss encountered")
         output_dict = {
-            'loss': torch.stack(loss).mean()
+            'loss': loss
         }
         return output_dict
         # return self._forward_loss(predicted_salience, salience_values)

@@ -6,7 +6,6 @@ from allennlp.data import Vocabulary
 from allennlp.data.iterators import BucketIterator
 from allennlp.data.tokenizers import WordTokenizer
 from allennlp.data.tokenizers.word_splitter import JustSpacesWordSplitter
-from allennlp.models import ComposedSeq2Seq
 from allennlp.modules import Embedding
 from allennlp.modules.seq2seq_decoders import LstmCellDecoderNet, AutoRegressiveSeqDecoder
 from allennlp.modules.seq2seq_encoders import PytorchSeq2SeqWrapper
@@ -25,7 +24,7 @@ if __name__ == '__main__':
     """
     logging.basicConfig(level=logging.INFO)
     EMBEDDING_DIM = 128
-    HIDDEN_DIM = 512
+    HIDDEN_DIM = 256
     MAX_SOURCE = 400
     """
     Setup Reader and Vocab
@@ -63,7 +62,7 @@ if __name__ == '__main__':
     Setup Trainer
     """
     optimizer = optim.Adam(model.parameters(), lr=0.1)
-    iterator = BucketIterator(batch_size=8, sorting_keys=[("source_tokens", "num_tokens")])
+    iterator = BucketIterator(batch_size=4, sorting_keys=[("source_tokens", "num_tokens")])
     iterator.index_with(vocab)
     if torch.cuda.is_available():
         cuda_device = 0

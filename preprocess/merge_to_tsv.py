@@ -1,4 +1,9 @@
+"""
+Take a src and tgt files (standard input in opennmt and fairseq) and join them into a single tsv
+"""
 import os
+
+from allennlp.common import Tqdm
 
 
 def gen_line(path):
@@ -15,9 +20,7 @@ if __name__ == '__main__':
     tgt = gen_line(tgt_path)
     new_lines = []
     i = 0
-    for src_line, tgt_line in zip(src, tgt):
-        print(i)
-        i += 1
+    for src_line, tgt_line in Tqdm.tqdm(zip(src, tgt)):
         new_line = src_line.strip() + '\t' + tgt_line.strip() + '\n'
         new_lines.append(new_line)
     file = open(os.path.join('../data/bbc/', os.path.basename(src_path).split('.')[0]+'.tsv'), 'w')

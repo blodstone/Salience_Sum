@@ -7,12 +7,17 @@ pip install -r requirements.txt
 ```
 
 ## Data
-We use the BBC data that comprised of: 
-- `train_src.txt` and `train_tgt.txt`
-- `val_src.txt` and `val_tgt.txt`
-- `test_src.txt` and `test_tgt.txt`
+We use the BBC data that comprised of the raw version: 
+- `train.tsv`
+- `test.tsv`
+- `val.tsv`
+and the salience model tagged version:
+- `train.tsv.tagged`
+- `test.tsv.tagged`
+- `val.tsv.tagged`
 
-There's another separate set of test data that
+## Tagging the document using multiple noisy models
+
 
 ## Generating noisy models
 To generate an unsupervised noisy salience, we process all set of source files.
@@ -21,11 +26,8 @@ To generate an unsupervised noisy salience, we process all set of source files.
 python preprocess-salience.py -input <path_to_source_folder> --submodular --NER --textrank --compression -max-words 30
 ```
 
-The process will generate labeled source files using `||` separator as follows.
+The process will generate labeled source files using `|#|` separator as follows.
 
-```text
-token1||salience1 token2||salience2
-```
 
 ## Current preprocess setting (for development purpose)
 Extract from raw data into data suitable for PKUSUMSUM
