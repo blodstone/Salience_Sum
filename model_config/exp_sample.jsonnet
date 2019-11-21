@@ -11,8 +11,8 @@ local EMBEDDING=128;
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "data/dev_bbc/train.dev.tsv.tagged",
-  "validation_data_path": "data/dev_bbc/val.dev.tsv.tagged",
+  "train_data_path": "data/dev_bbc/train.dev.tsv.tagged.small",
+  "validation_data_path": "data/dev_bbc/val.dev.tsv.tagged.small",
   "model": {
     "type": "salience_seq2seq",
     "noisy_prediction": {
@@ -62,13 +62,15 @@ local EMBEDDING=128;
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
+    "grad_norm": 2.0,
     "histogram_interval": 1,
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": -1,
     "optimizer": {
-      "type": "adam",
-      "lr": 0.01
+      "type": "adagrad",
+      "lr": 0.15,
+      "initial_accumulator_value": 0.1
     },
 
   }

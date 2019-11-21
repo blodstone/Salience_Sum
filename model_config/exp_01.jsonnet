@@ -25,7 +25,7 @@ local EMBEDDING=128;
         "type": "denoising_encoder",
         "bidirectional": true,
         "num_layers": 1,
-        "use_bridge": true,
+        "use_bridge": false,
         "input_size": EMBEDDING,
         "hidden_size": HIDDEN
       },
@@ -62,13 +62,14 @@ local EMBEDDING=128;
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "histogram_interval": 1,
+    "grad_norm": 2.0,
+    "histogram_interval": 10,
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": -1,
-    "grad_norm": 2,
+    "num_serialized_models_to_keep": 5,
     "optimizer": {
-      "type": "ada",
+      "type": "adagrad",
       "lr": 0.15,
       "initial_accumulator_value": 0.1
     },
