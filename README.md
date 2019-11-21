@@ -17,7 +17,22 @@ and the salience model tagged version:
 - `val.tsv.tagged`
 
 ## Tagging the document using multiple noisy models
-
+### PKUSUM
+Split the one file document into document files for PKUSUM processing.
+*Need to argparse the path, for now we change the path manually*
+```bash
+cd preprocess
+python generate_docs_pkusum.py
+```
+Run the script. Each script for training takes 30 hours to run (the val will take ~3 hours).  
+```bash
+./centroid.sh
+./centroid_val.sh
+./submodular.sh
+./submodular_val.sh
+./textrank.sh
+./textrank_val.sh
+```
 
 ## Generating noisy models
 To generate an unsupervised noisy salience, we process all set of source files.
@@ -38,7 +53,7 @@ The noisy models are using the unsupervised models by PKUSUMSUM system. There ar
 
 Run the PKUSUMSUM system first and generate each of the model summary into their respective folder.Then run a script for preprocessing the result into a text file. The doc path is fixed (with exception of the system's summ path) but the output path has to be manually changed for each system. This is for temporary measure only.
 ```bash
-python special_preprocess.py
+python retrieve_pkusum_summ.py
 ```
 Convert all the documents and summaries to spacy object. For each PKUSUMSUM output, we have to change to it respective output.
 ```bash
