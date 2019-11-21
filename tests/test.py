@@ -1,11 +1,9 @@
 import logging
 import os
 
-import pytest
 import torch
-from allennlp.common.testing import ModelTestCase
 
-from allennlp.data import Tokenizer, Vocabulary
+from allennlp.data import Vocabulary
 from allennlp.data.iterators import BucketIterator
 from allennlp.data.tokenizers import WordTokenizer
 from allennlp.data.tokenizers.word_splitter import JustSpacesWordSplitter
@@ -16,9 +14,9 @@ from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.training import Trainer
 from torch import optim
 
-from model.denoising_encoder import DenoisingEncoder
-from model.salience_model import SalienceSeq2Seq
-from reader.summ_data_reader import SummDataReader
+from salience_sum.model import DenoisingEncoder
+from salience_sum.model.salience_model import SalienceSeq2Seq
+from salience_sum.reader import SummDataReader
 
 EMBEDDING_DIM = 128
 HIDDEN_DIM = 64

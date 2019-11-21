@@ -3,12 +3,12 @@ from typing import Optional, Iterable
 import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.special import softmax
-from allennlp.data import DatasetReader, Tokenizer, Instance
+from allennlp.data import DatasetReader, Tokenizer, Instance, Token
 from allennlp.data.fields import TextField, ArrayField
 from allennlp.data.token_indexers import SingleIdTokenIndexer
 
 
-@DatasetReader.register("summdata")
+@DatasetReader.register("summdatareader")
 class SummDataReader(DatasetReader):
 
     def __init__(self,
@@ -25,8 +25,12 @@ class SummDataReader(DatasetReader):
         with open(file_path) as file:
             for line in file:
                 src_tagged_seq, tgt_seq = line.split('\t')
-                src_seq, salience_seq = zip(*[group.split('|#|') for group in src_tagged_seq.split()])
-                yield self.text_to_instance(' '.join(src_seq), tgt_seq, [float(value) for value in salience_seq])
+                src_seq, salience_seq = zip(*[group.split('|%|') for group in src_tagged_seq.split()])
+                assert len(src_seq) == len(salience_seq)
+                yield self.text_to_instance(
+                    [Token(token) for token in src_seq],
+                    tgt_seq,
+                    [float(value) for value in salience_seq])
 
     def smooth_and_norm_probs(self, prob):
         prob_dict = {i: x for i, x in enumerate(prob) if x != 0}
@@ -34,14 +38,14 @@ class SummDataReader(DatasetReader):
         c = [float(cs(i)) if i in prob_dict.keys() else cs(i)*cs(i) for i in range(len(prob)) ]
         return c
 
-    def text_to_instance(self, src_seq: str, tgt_seq: str, salience_seq: Iterable[float]) -> Instance:
+    def text_to_instance(self, src_seq: Iterable[Token], tgt_seq: str, salience_seq: Iterable[float]) -> Instance:
         indexer = SingleIdTokenIndexer(lowercase_tokens=True)
-        tokenized_src = self._tokenizer.tokenize(src_seq)[:self._source_max_tokens]
+        tokenized_src = src_seq[:self._source_max_tokens]
         tokenized_tgt = self._tokenizer.tokenize(tgt_seq)[:self._target_max_tokens]
         source_field = TextField(tokenized_src, {'tokens': indexer})
         target_field = TextField(tokenized_tgt, {'tokens': indexer})
-        new_salience_seq = self.smooth_and_norm_probs(salience_seq[:self._source_max_tokens])
-        saliency_field = ArrayField(np.array(new_salience_seq))
+        # new_salience_seq = self.smooth_and_norm_probs(salience_seq[:self._source_max_tokens])
+        saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
         return Instance({
             'source_tokens': source_field,
             'target_tokens': target_field,

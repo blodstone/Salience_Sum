@@ -1,5 +1,4 @@
 from typing import Dict, Optional
-
 import torch
 from overrides import overrides
 
@@ -10,6 +9,8 @@ from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.modules.seq2seq_decoders.seq_decoder import SeqDecoder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
+
+from salience_sum.model import NoisyPredictionModel
 
 
 @Model.register("salience_seq2seq")
@@ -50,7 +51,7 @@ class SalienceSeq2Seq(Model):
                  source_text_embedder: TextFieldEmbedder,
                  encoder: Seq2SeqEncoder,
                  decoder: SeqDecoder,
-                 noisy_prediction: Model,
+                 noisy_prediction: NoisyPredictionModel,
                  tied_source_embedder_key: Optional[str] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: Optional[RegularizerApplicator] = None)-> None:
@@ -108,8 +109,10 @@ class SalienceSeq2Seq(Model):
             The output tensors from the decoder.
         """
         state = self._encode(source_tokens)
-        decoder_output = self._decoder(state, source_tokens)
         salience_output = self._noisy_prediction(state, salience_values)
+        decoder_output = self._decoder(state, source_tokens)
+        # print("Salience loss: {}".format(decoder_output['loss']))
+        # print("Decoder loss: {}".format(salience_output['loss']))
         final_output = {
             'loss': decoder_output['loss'] + salience_output['loss']
         }
