@@ -33,7 +33,10 @@ Run the script. Each script for training takes 30 hours to run (the val will tak
 ./textrank.sh
 ./textrank_val.sh
 ```
-
+Once all scripts are done, run
+```bash
+python preprocess_salience_from_pkupu.py
+```
 ## Generating noisy models
 To generate an unsupervised noisy salience, we process all set of source files.
 
