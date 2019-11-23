@@ -72,6 +72,8 @@ local EMBEDDING=128;
       "lr": 0.15,
       "initial_accumulator_value": 0.1
     },
-
+  },
+  "vocabulary": {
+    "max_vocab_size": 80000
   }
 }

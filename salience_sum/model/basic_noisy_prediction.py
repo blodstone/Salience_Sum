@@ -8,6 +8,7 @@ from allennlp.common import Registrable
 from allennlp.data import Vocabulary
 from allennlp.models import Model
 from allennlp.nn import RegularizerApplicator
+from allennlp.training.metrics import CategoricalAccuracy
 
 
 class NoisyPredictionModel(nn.Module, Registrable):
@@ -67,22 +68,10 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self._bidirectional_input = bidirectional_input
         self.criterion = nn.MSELoss()
         self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
+        self.loss = 0
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return super().get_metrics(reset)
-
-    def KL_div(self, a, b):
-        log_a = a.log()
-        log_b = b.log()
-        log_a[log_a == float('-inf')] = 0
-        log_b[log_b == float('-inf')] = 0
-        return (b * (log_b - log_a)).sum()
-
-    def _get_loss(self, predicted_salience, salience_values) -> Dict[str, torch.Tensor]:
-        # Jensen Shannon Divergence
-        m = (predicted_salience + salience_values) * 0.5
-        distance = 0.5 * self.KL_div(predicted_salience, m) + 0.5 * self.KL_div(salience_values, m)
-        return distance
+        return {"RMSE": self.loss.item()}
 
     def forward(self,
                 encoder_out: Dict[str, torch.LongTensor],
@@ -92,11 +81,11 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         # shape: (batch_size, seq_len, 1)
         regression_output = self.regression(encoder_out['encoder_outputs'])
         predicted_salience = torch.relu(regression_output).squeeze(dim=2) + 1e-6
-        loss = torch.sqrt(self.criterion(predicted_salience, salience_values))
-        if torch.isnan(loss):
+        self.loss = torch.sqrt(self.criterion(predicted_salience, salience_values))
+        if torch.isnan(self.loss):
             raise ValueError("nan loss encountered")
         output_dict = {
-            'loss': loss
+            'loss': self.loss
         }
         return output_dict
         # return self._forward_loss(predicted_salience, salience_values)

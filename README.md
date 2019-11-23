@@ -37,6 +37,10 @@ Once all scripts are done, run
 ```bash
 python preprocess_salience_from_pkupu.py
 ```
+
+```bash
+allennlp train model_config/exp_01.jsonnet --serialization-dir data/train_01 --include-package salience_sum --file-friendly-logging
+```
 ## Generating noisy models
 To generate an unsupervised noisy salience, we process all set of source files.
 
