@@ -5,7 +5,7 @@ from overrides import overrides
 from allennlp.common.checks import ConfigurationError
 from allennlp.data.vocabulary import Vocabulary
 from allennlp.models.model import Model
-from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding
+from allennlp.modules import TextFieldEmbedder, Seq2SeqEncoder, Embedding, InputVariationalDropout
 from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.modules.seq2seq_decoders.seq_decoder import SeqDecoder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
@@ -52,6 +52,7 @@ class SalienceSeq2Seq(Model):
                  encoder: Seq2SeqEncoder,
                  decoder: SeqDecoder,
                  noisy_prediction: NoisyPredictionModel,
+                 dropout: float = 0.2,
                  tied_source_embedder_key: Optional[str] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: Optional[RegularizerApplicator] = None)-> None:
@@ -61,6 +62,7 @@ class SalienceSeq2Seq(Model):
         self._source_text_embedder = source_text_embedder
         self._encoder = encoder
         self._decoder = decoder
+        self._dropout = InputVariationalDropout(dropout)
         self._noisy_prediction = noisy_prediction
 
         if self._encoder.get_output_dim() != self._decoder.get_output_dim():
@@ -108,7 +110,7 @@ class SalienceSeq2Seq(Model):
         Dict[str, torch.Tensor]
             The output tensors from the decoder.
         """
-        state = self._encode(source_tokens)
+        state = self._encode(self._dropout(source_tokens))
         salience_output = self._noisy_prediction(state, salience_values)
         decoder_output = self._decoder(state, source_tokens)
         # print("Salience loss: {}".format(decoder_output['loss']))

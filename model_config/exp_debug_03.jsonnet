@@ -1,7 +1,7 @@
-local HIDDEN=512;
-local EMBEDDING=256;
-local FFHIDDEN=1024;
-local PROJ=256;
+local HIDDEN=100;
+local EMBEDDING=20;
+local FFHIDDEN=100;
+local PROJ=20;
 {
   "dataset_reader": {
     "type": "summdatareader",
@@ -14,8 +14,8 @@ local PROJ=256;
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged",
-  "validation_data_path": "data/bbc_allen/val.tsv.tagged",
+  "train_data_path": "../data/dev_bbc/train.dev.tsv.tagged.small",
+  "validation_data_path": "../data/dev_bbc/val.dev.tsv.tagged.small",
   "model": {
     "type": "salience_seq2seq",
     "noisy_prediction": {
@@ -28,7 +28,7 @@ local PROJ=256;
       "hidden_dim": HIDDEN,
       "projection_dim": PROJ,
       "feedforward_hidden_dim": FFHIDDEN,
-      "num_attention_heads": 8,
+      "num_attention_heads": 4,
       "num_layers": 4,
       "dropout_prob": 0.1
     },
@@ -47,7 +47,7 @@ local PROJ=256;
          "decoding_dim": HIDDEN,
          "target_embedding_dim": EMBEDDING,
          "feedforward_hidden_dim": FFHIDDEN,
-         "num_attention_heads": 8,
+         "num_attention_heads": 4,
          "num_layers": 4,
       },
       "max_decoding_steps": 400,
@@ -73,7 +73,7 @@ local PROJ=256;
     "histogram_interval": 10000,
     "num_epochs": 30,
     "patience": 10,
-    "cuda_device": 0,
+    "cuda_device": -1,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
       "type": "adam",

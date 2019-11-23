@@ -9,7 +9,7 @@ class SalienceModelTest(ModelTestCase):
         super().setUp()
         logging.basicConfig(level=logging.INFO)
         self.set_up_model(
-            '../model_config/exp_debug.jsonnet',
+            '../model_config/exp_debug_03.jsonnet',
             '../data/dev_bbc/train.dev.tsv.tagged.small')
 
     def test_model_can_train_save_and_load(self):
