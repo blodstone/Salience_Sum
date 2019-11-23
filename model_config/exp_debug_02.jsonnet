@@ -1,5 +1,8 @@
 local HIDDEN=100;
 local EMBEDDING=50;
+local PROJECTION=25;
+local FFHIDDEN=25;
+
 {
   "dataset_reader": {
     "type": "summdatareader",
@@ -20,15 +23,14 @@ local EMBEDDING=50;
       "hidden_dim": HIDDEN
     },
     "encoder": {
-        "type": "seq2seqwrapper",
-        "module": {
-          "type": "denoising_encoder",
-          "bidirectional": true,
-          "num_layers": 1,
-          "use_bridge": false,
-          "input_size": EMBEDDING,
-          "hidden_size": HIDDEN
-        },
+        "type": "stacked_self_attention",
+        "input_dim": EMBEDDING,
+        "hidden_dim": HIDDEN,
+        "projection_dim": PROJECTION,
+        "feedforward_hidden_dim": FFHIDDEN,
+        "num_attention_heads": 3,
+        "num_layers": 4,
+        "dropout_prob": 0.1
       },
     "source_text_embedder": {
       "token_embedders": {

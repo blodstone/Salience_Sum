@@ -66,7 +66,7 @@ local EMBEDDING=128;
     "histogram_interval": 10,
     "num_epochs": 50,
     "patience": 10,
-    "cuda_device": -1,
+    "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
       "type": "adagrad",

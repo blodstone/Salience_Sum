@@ -159,4 +159,4 @@ class SalienceSeq2Seq(Model):
 
     @overrides
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return self._decoder.get_metrics(reset)
+        return self._noisy_prediction.get_metrics(reset)
