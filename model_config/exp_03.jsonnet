@@ -1,5 +1,5 @@
 local HIDDEN=512;
-local EMBEDDING=128;
+local EMBEDDING=256;
 {
   "dataset_reader": {
     "type": "summdatareader",
@@ -21,15 +21,14 @@ local EMBEDDING=128;
       "hidden_dim": HIDDEN
     },
     "encoder": {
-      "type": "seq2seqwrapper",
-      "module": {
-        "type": "denoising_encoder",
-        "bidirectional": true,
-        "num_layers": 1,
-        "use_bridge": false,
-        "input_size": EMBEDDING,
-        "hidden_size": HIDDEN
-      },
+      "type": "stacked_self_attention",
+      "input_dim": EMBEDDING,
+      "hidden_dim": HIDDEN,
+      "projection_dim": 256,
+      "feedforward_hidden_dim": 512,
+      "num_attention_heads": 8,
+      "num_layers": 4,
+      "dropout_prob": 0.1
     },
     "source_text_embedder": {
       "token_embedders": {
@@ -59,7 +58,7 @@ local EMBEDDING=128;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 10,
+    "batch_size" : 8,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
@@ -70,9 +69,8 @@ local EMBEDDING=128;
     "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
-      "type": "adagrad",
-      "lr": 0.15,
-      "initial_accumulator_value": 0.1
+      "type": "adam",
+      "lr": 0.15
     },
   },
   "vocabulary": {

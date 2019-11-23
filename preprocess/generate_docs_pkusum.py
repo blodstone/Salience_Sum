@@ -16,13 +16,13 @@ def generate(input_path, output_path, type='doc'):
 
 
 if __name__ == '__main__':
-    file_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/dev_bbc'
-    i_paths = ['train.dev.tsv', 'val.dev.tsv']
+    file_path = '../data/bbc_allen'
+    i_paths = ['train.tsv', 'val.tsv']
     g_paths = [['submodular', 'textrank', 'centroid'], ['submodular_val', 'textrank_val', 'centroid_val']]
     doc_names = ['train', 'val']
-    output = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs'
-    output_doc = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs'
-    output_gold = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/gold'
+    output = '../../PKUSUMSUM/summs'
+    output_doc = '../../PKUSUMSUM/docs'
+    output_gold = '../../PKUSUMSUM/gold'
     # for i_path, o_paths in zip(i_paths, g_paths):
     #     for o_path in o_paths:
     #         input_path = os.path.join(file_path, i_path)
