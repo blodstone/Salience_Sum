@@ -33,6 +33,8 @@ class SummDataReader(DatasetReader):
                     [float(value) for value in salience_seq])
 
     def smooth_and_norm(self, value):
+        if len(value) < 2:
+            return value
         value_dict = {i: x for i, x in enumerate(value) if x != 0}
         cs = CubicSpline(list(value_dict.keys()), list(value_dict.values()))
         c = [float(cs(i)) if i in value_dict.keys() else cs(i)*cs(i) for i in range(len(value))]
