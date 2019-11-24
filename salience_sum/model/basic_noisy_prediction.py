@@ -69,7 +69,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self.criterion = nn.MSELoss()
         self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
         with torch.no_grad():
-            self.regression.weight = torch.randint(1, 10, (hidden_dim, 1))
+            self.regression.weight.data = torch.randint(1, 10, (1, hidden_dim), dtype=torch.float)
         self.loss = 0
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
