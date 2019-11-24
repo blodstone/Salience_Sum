@@ -33,11 +33,12 @@ class SummDataReader(DatasetReader):
                     [float(value) for value in salience_seq])
 
     def smooth_and_norm(self, value):
-        if len(value) < 2:
-            return value
         value_dict = {i: x for i, x in enumerate(value) if x != 0}
-        cs = CubicSpline(list(value_dict.keys()), list(value_dict.values()))
-        c = [float(cs(i)) if i in value_dict.keys() else cs(i)*cs(i) for i in range(len(value))]
+        try:
+            cs = CubicSpline(list(value_dict.keys()), list(value_dict.values()))
+        except:
+            return value
+        c = [float(cs(i)) if i in value_dict.keys() else cs(i) * cs(i) for i in range(len(value))]
         return c
 
     def text_to_instance(self, src_seq: Iterable[Token], tgt_seq: str, salience_seq: Iterable[float]) -> Instance:
@@ -46,8 +47,8 @@ class SummDataReader(DatasetReader):
         tokenized_tgt = self._tokenizer.tokenize(tgt_seq)[:self._target_max_tokens]
         source_field = TextField(tokenized_src, {'tokens': indexer})
         target_field = TextField(tokenized_tgt, {'tokens': indexer})
-        # saliency_field = self.smooth_and_norm(salience_seq)[:self._source_max_tokens]
-        saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
+        saliency_field = self.smooth_and_norm(salience_seq)[:self._source_max_tokens]
+        # saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
         return Instance({
             'source_tokens': source_field,
             'target_tokens': target_field,
