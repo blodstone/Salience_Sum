@@ -65,6 +65,8 @@ local PROJ=256;
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
+    "type": "fp16-trainer",
+    "mixed_precision": true,
     "grad_norm": 5.0,
     "grad_clipping": 1.0,
     "summary_interval": 5000,
