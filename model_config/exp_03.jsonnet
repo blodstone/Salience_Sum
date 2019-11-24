@@ -21,7 +21,8 @@ local PROJ=256;
     "type": "salience_seq2seq",
     "noisy_prediction": {
       "type": "basic_noisy_prediction",
-      "hidden_dim": HIDDEN
+      "hidden_dim": HIDDEN,
+      "proj_dim": PROJ,
     },
     "encoder": {
       "type": "stacked_self_attention",
