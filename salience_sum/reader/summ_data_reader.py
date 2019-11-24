@@ -47,8 +47,7 @@ class SummDataReader(DatasetReader):
         tokenized_tgt = self._tokenizer.tokenize(tgt_seq)[:self._target_max_tokens]
         source_field = TextField(tokenized_src, {'tokens': indexer})
         target_field = TextField(tokenized_tgt, {'tokens': indexer})
-        saliency_field = self.smooth_and_norm(salience_seq)[:self._source_max_tokens]
-        # saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
+        saliency_field = ArrayField(np.array(self.smooth_and_norm(salience_seq)[:self._source_max_tokens]))
         return Instance({
             'source_tokens': source_field,
             'target_tokens': target_field,
