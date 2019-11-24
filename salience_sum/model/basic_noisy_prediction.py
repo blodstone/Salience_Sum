@@ -69,7 +69,8 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self.criterion = nn.MSELoss()
         self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
         with torch.no_grad():
-            self.regression.weight.data = torch.randint(1, 10, (1, hidden_dim), dtype=torch.float)
+            self.regression.weight.data = torch.nn.init.kaiming_normal_(
+                torch.tensor(1, hidden_dim, dtype=float), mode='fan_out', nonlinearity='leaky_relu')
         self.loss = 0
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
