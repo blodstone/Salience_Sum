@@ -1,6 +1,6 @@
 local HIDDEN=100;
-local EMBEDDING=20;
-local FFHIDDEN=100;
+local EMBEDDING=100;
+local FFHIDDEN=120;
 local PROJ=20;
 {
   "dataset_reader": {

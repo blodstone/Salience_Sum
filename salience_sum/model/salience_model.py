@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 import torch
+from allennlp.nn.util import get_text_field_mask
 from overrides import overrides
 
 from allennlp.common.checks import ConfigurationError
@@ -55,7 +56,7 @@ class SalienceSeq2Seq(Model):
                  dropout: float = 0.2,
                  tied_source_embedder_key: Optional[str] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
-                 regularizer: Optional[RegularizerApplicator] = None)-> None:
+                 regularizer: Optional[RegularizerApplicator] = None) -> None:
 
         super(SalienceSeq2Seq, self).__init__(vocab, regularizer)
 
@@ -91,7 +92,7 @@ class SalienceSeq2Seq(Model):
     def forward(self,  # type: ignore
                 source_tokens: Dict[str, torch.LongTensor],
                 target_tokens: Dict[str, torch.LongTensor] = None,
-                salience_values = None) -> Dict[str, torch.Tensor]:
+                salience_values=None) -> Dict[str, torch.Tensor]:
         # pylint: disable=arguments-differ
         """
         Make foward pass on the encoder and decoder for producing the entire target sequence.
@@ -110,7 +111,7 @@ class SalienceSeq2Seq(Model):
         Dict[str, torch.Tensor]
             The output tensors from the decoder.
         """
-        state = self._encode(self._dropout(source_tokens))
+        state = self._encode(source_tokens)
         salience_output = self._noisy_prediction(state, salience_values)
         decoder_output = self._decoder(state, source_tokens)
         # print("Salience loss: {}".format(decoder_output['loss']))
@@ -149,14 +150,14 @@ class SalienceSeq2Seq(Model):
             forward pass on the encoder.
         """
         # shape: (batch_size, max_input_sequence_length, encoder_input_dim)
-        embedded_input = self._source_text_embedder(source_tokens)
+        embedded_input = self._dropout(self._source_text_embedder(source_tokens))
         # shape: (batch_size, max_input_sequence_length)
         source_mask = util.get_text_field_mask(source_tokens)
         # shape: (batch_size, max_input_sequence_length, encoder_output_dim)
         encoder_outputs = self._encoder(embedded_input, source_mask)
         return {
-                "source_mask": source_mask,
-                "encoder_outputs": encoder_outputs,
+            "source_mask": source_mask,
+            "encoder_outputs": encoder_outputs,
         }
 
     @overrides
