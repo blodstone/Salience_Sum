@@ -70,7 +70,6 @@ local PROJ=256;
     "grad_clipping": 1.0,
     "summary_interval": 5000,
     "histogram_interval": 10000,
-    "validation_metric": "+accuracy",
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": 0,

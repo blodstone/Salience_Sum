@@ -117,7 +117,7 @@ class SalienceSeq2Seq(Model):
         # print("Salience loss: {}".format(decoder_output['loss']))
         # print("Decoder loss: {}".format(salience_output['loss']))
         final_output = {
-            'loss': decoder_output['loss'] + 10 * salience_output['loss']
+            'loss': decoder_output['loss'] + 6*salience_output['loss']
         }
         if torch.isnan(final_output['loss']):
             raise ValueError("nan loss encountered")
