@@ -6,7 +6,7 @@ local PROJ=256;
   "dataset_reader": {
     "type": "summdatareader",
     "lazy": false,
-    "interpolation": true,
+    "interpolation": false,
     "tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -61,24 +61,23 @@ local PROJ=256;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 10,
+    "batch_size" : 12,
     "instances_per_epoch" : 100000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "type": "fp16-trainer",
-    "mixed_precision": true,
     "grad_norm": 5.0,
     "grad_clipping": 1.0,
     "summary_interval": 5000,
     "histogram_interval": 10000,
+    "validation_metric": "+accuracy",
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
       "type": "adam",
-      "lr": 0.15
+      "lr": 0.01
     },
   },
   "vocabulary": {

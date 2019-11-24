@@ -68,6 +68,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self._bidirectional_input = bidirectional_input
         self.criterion = nn.MSELoss()
         self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
+        self.activation = torch.nn.LeakyReLU()
         # with torch.no_grad():
         #     self.regression.weight.data = torch.nn.init.kaiming_normal_(
         #         torch.empty(1, hidden_dim), mode='fan_out', nonlinearity='leaky_relu')
@@ -83,8 +84,8 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
 
         # shape: (batch_size, seq_len, 1)
         regression_output = self.regression(encoder_out['encoder_outputs'])
-        # predicted_salience = torch.relu(regression_output).squeeze(dim=2) + 1e-6
-        predicted_salience = regression_output.squeeze(dim=2)
+        predicted_salience = self.activation(regression_output).squeeze(dim=2)
+        # predicted_salience = regression_output.squeeze(dim=2)
         self.loss = self.criterion(predicted_salience, salience_values)
         if torch.isnan(self.loss):
             raise ValueError("nan loss encountered")
