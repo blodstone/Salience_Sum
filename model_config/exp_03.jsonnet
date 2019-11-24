@@ -1,5 +1,5 @@
 local HIDDEN=512;
-local EMBEDDING=512;
+local EMBEDDING=256;
 local FFHIDDEN=2048;
 local PROJ=256;
 {
@@ -43,12 +43,9 @@ local PROJ=256;
     },
     "decoder": {
       "decoder_net": {
-         "type": "stacked_self_attention",
+         "type": "lstm_cell",
          "decoding_dim": HIDDEN,
-         "target_embedding_dim": EMBEDDING,
-         "feedforward_hidden_dim": FFHIDDEN,
-         "num_attention_heads": 8,
-         "num_layers": 4,
+         "target_embedding_dim": EMBEDDING
       },
       "max_decoding_steps": 400,
       "target_namespace": "tokens",
@@ -71,7 +68,7 @@ local PROJ=256;
     "grad_norm": 2.0,
     "summary_interval": 5000,
     "histogram_interval": 10000,
-    "num_epochs": 30,
+    "num_epochs": 50,
     "patience": 10,
     "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
