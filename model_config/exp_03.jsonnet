@@ -53,19 +53,20 @@ local PROJ=256;
         "vocab_namespace": "tokens",
         "embedding_dim": EMBEDDING
       },
-      "scheduled_sampling_ratio": 0.8,
+      "scheduled_sampling_ratio": 0.9,
       "beam_size": 5
     }
   },
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 8,
+    "batch_size" : 10,
     "instances_per_epoch" : 100000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "grad_norm": 2.0,
+    "grad_norm": 5.0,
+    "grad_clipping": 1.0,
     "summary_interval": 5000,
     "histogram_interval": 10000,
     "num_epochs": 50,
@@ -78,6 +79,6 @@ local PROJ=256;
     },
   },
   "vocabulary": {
-    "max_vocab_size": 80000
+    "max_vocab_size": 50000
   }
 }
