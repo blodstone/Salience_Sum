@@ -6,6 +6,7 @@ local PROJ=256;
   "dataset_reader": {
     "type": "summdatareader",
     "lazy": false,
+    "interpolation": true,
     "tokenizer": {
       "type": "word",
       "word_splitter": {

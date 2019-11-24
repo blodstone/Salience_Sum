@@ -15,11 +15,13 @@ class SummDataReader(DatasetReader):
                  tokenizer: Tokenizer = None,
                  source_max_tokens: Optional[int] = None,
                  target_max_tokens: Optional[int] = None,
+                 interpolation: bool = False,
                  lazy: bool = False) -> None:
         super().__init__(lazy)
         self._tokenizer = tokenizer
         self._source_max_tokens = source_max_tokens
         self._target_max_tokens = target_max_tokens
+        self._interpolation = interpolation
 
     def _read(self, file_path: str) -> Iterable[Instance]:
         with open(file_path) as file:
@@ -47,8 +49,10 @@ class SummDataReader(DatasetReader):
         tokenized_tgt = self._tokenizer.tokenize(tgt_seq)[:self._target_max_tokens]
         source_field = TextField(tokenized_src, {'tokens': indexer})
         target_field = TextField(tokenized_tgt, {'tokens': indexer})
-        # saliency_field = ArrayField(np.array(self.smooth_and_norm(salience_seq)[:self._source_max_tokens]))
-        saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
+        if self._interpolation:
+            saliency_field = ArrayField(np.array(self.smooth_and_norm(salience_seq)[:self._source_max_tokens]))
+        else:
+            saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
         return Instance({
             'source_tokens': source_field,
             'target_tokens': target_field,
