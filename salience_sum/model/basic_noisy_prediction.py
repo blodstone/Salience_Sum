@@ -63,12 +63,15 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
 
     def __init__(self,
                  hidden_dim: int,
+                 proj_dim: int,
                  bidirectional_input=False) -> None:
         super().__init__()
         self._bidirectional_input = bidirectional_input
         self.criterion = nn.MSELoss()
-        self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
-        self.activation = torch.nn.LogSigmoid()
+        self.projection = torch.nn.Linear(hidden_dim, proj_dim, bias=True)
+        self.activation_1 = torch.nn.ReLU()
+        self.regression = torch.nn.Linear(proj_dim, 1)
+        # self.activation_2 = torch.nn.LogSigmoid()
         # with torch.no_grad():
         #     self.regression.weight.data = torch.nn.init.kaiming_normal_(
         #         torch.empty(1, hidden_dim), mode='fan_out', nonlinearity='leaky_relu')
@@ -83,11 +86,11 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
                 ) -> Dict[str, torch.Tensor]:
 
         # shape: (batch_size, seq_len, 1)
-        regression_output = self.regression(encoder_out['encoder_outputs'])
-        predicted_salience = self.activation(regression_output).squeeze(dim=2)
+        projection = self.activation_1(self.projection(encoder_out['encoder_outputs']))
+        regression_output = self.regression(projection)
+        predicted_salience = regression_output.squeeze(dim=2)
         # predicted_salience = regression_output.squeeze(dim=2)
-        self.loss = self.criterion(self.activation(predicted_salience),
-                                   self.activation(salience_values))
+        self.loss = self.criterion(predicted_salience, salience_values)
         if torch.isnan(self.loss):
             raise ValueError("nan loss encountered")
         output_dict = {

@@ -68,8 +68,8 @@ local PROJ=256;
   "trainer": {
     "grad_norm": 5.0,
     "grad_clipping": 1.0,
-    "summary_interval": 5000,
-    "histogram_interval": 10000,
+    "summary_interval": 500,
+    "histogram_interval": 1000,
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": 0,
