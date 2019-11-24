@@ -1,9 +1,12 @@
-local HIDDEN=512;
-local EMBEDDING=128;
+local HIDDEN=50;
+local EMBEDDING=20;
+local FFHIDDEN=100;
+local PROJ=20;
 {
   "dataset_reader": {
     "type": "summdatareader",
     "lazy": false,
+    "interpolation": false,
     "tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -12,24 +15,24 @@ local EMBEDDING=128;
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged",
-  "validation_data_path": "data/bbc_allen/val.tsv.tagged",
+  "train_data_path": "data/dev_bbc/train.dev.tsv.tagged.small",
+  "validation_data_path": "data/dev_bbc/val.dev.tsv.tagged.small",
   "model": {
     "type": "salience_seq2seq",
     "noisy_prediction": {
       "type": "basic_noisy_prediction",
-      "hidden_dim": HIDDEN
+      "hidden_dim": HIDDEN,
+      "proj_dim": PROJ,
     },
     "encoder": {
-      "type": "seq2seqwrapper",
-      "module": {
-        "type": "denoising_encoder",
-        "bidirectional": true,
-        "num_layers": 1,
-        "use_bridge": false,
-        "input_size": EMBEDDING,
-        "hidden_size": HIDDEN
-      },
+      "type": "stacked_self_attention",
+      "input_dim": EMBEDDING,
+      "hidden_dim": HIDDEN,
+      "projection_dim": PROJ,
+      "feedforward_hidden_dim": FFHIDDEN,
+      "num_attention_heads": 2,
+      "num_layers": 2,
+      "dropout_prob": 0.1
     },
     "source_text_embedder": {
       "token_embedders": {
@@ -59,23 +62,25 @@ local EMBEDDING=128;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 10,
+    "batch_size" : 4,
+    "instances_per_epoch" : 100000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "grad_norm": 2.0,
-    "histogram_interval": 10,
+    "grad_norm": 5.0,
+    "grad_clipping": 1.0,
+    "summary_interval": 500,
+    "histogram_interval": 1000,
     "num_epochs": 50,
     "patience": 10,
     "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
-      "type": "adagrad",
-      "lr": 0.15,
-      "initial_accumulator_value": 0.1
+      "type": "adam",
+      "lr": 0.01
     },
   },
   "vocabulary": {
-    "max_vocab_size": 80000
+    "max_vocab_size": 50000
   }
 }
