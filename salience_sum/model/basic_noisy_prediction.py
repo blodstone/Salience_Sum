@@ -68,6 +68,8 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self._bidirectional_input = bidirectional_input
         self.criterion = nn.MSELoss()
         self.regression = torch.nn.Linear(hidden_dim, 1, bias=True)
+        with torch.no_grad():
+            self.regression.weight = torch.randint(1, 10, (hidden_dim, 1))
         self.loss = 0
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
@@ -81,7 +83,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         # shape: (batch_size, seq_len, 1)
         regression_output = self.regression(encoder_out['encoder_outputs'])
         predicted_salience = torch.relu(regression_output).squeeze(dim=2) + 1e-6
-        self.loss = torch.sqrt(self.criterion(predicted_salience, salience_values))
+        self.loss = self.criterion(predicted_salience, salience_values)
         if torch.isnan(self.loss):
             raise ValueError("nan loss encountered")
         output_dict = {

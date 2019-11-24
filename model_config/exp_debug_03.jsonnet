@@ -43,12 +43,9 @@ local PROJ=20;
     },
     "decoder": {
       "decoder_net": {
-         "type": "stacked_self_attention",
+         "type": "lstm_cell",
          "decoding_dim": HIDDEN,
-         "target_embedding_dim": EMBEDDING,
-         "feedforward_hidden_dim": FFHIDDEN,
-         "num_attention_heads": 4,
-         "num_layers": 4,
+         "target_embedding_dim": EMBEDDING
       },
       "max_decoding_steps": 400,
       "target_namespace": "tokens",
