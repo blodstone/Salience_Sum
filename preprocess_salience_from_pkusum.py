@@ -128,23 +128,23 @@ def main(args):
         write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
         write_file.writelines(new_lines)
         write_file.close()
-    # src_path = args.src
+    # src_folder = args.src
     # if args.AKE:
     #     window = args.window
-    #     results['AKE'] = AKE.run(max_words, window, src_path)
+    #     results['AKE'] = AKE.run(max_words, window, src_folder)
     # if args.NER:
-    #     results['NER'] = NER.run(max_words, src_path)
+    #     results['NER'] = NER.run(max_words, src_folder)
     #
     # if args.submodular:
-    #     tgt_path = args.centroid_tgt
-    #     results['centroid'] = pkusumsum.run(src_path, tgt_path)
+    #     tgt_folder = args.centroid_tgt
+    #     results['centroid'] = pkusumsum.run(src_folder, tgt_folder)
     # if args.submodular:
-    #     tgt_path = args.textrank_tgt
-    #     results['textrank'] = pkusumsum.run(src_path, tgt_path)
+    #     tgt_folder = args.textrank_tgt
+    #     results['textrank'] = pkusumsum.run(src_folder, tgt_folder)
     # if args.gold:
     #     highlight_path = args.highlight
     #     doc_id_path = args.doc_id
-    #     gold_result = gold.run(src_path, highlight_path, doc_id_path)
+    #     gold_result = gold.run(src_folder, highlight_path, doc_id_path)
     #
     # df_scores = process_results(results)
     # df_gold_scores = process_gold_result(gold_result)

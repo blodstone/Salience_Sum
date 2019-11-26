@@ -119,6 +119,9 @@ class SalienceSeq2Seq(Model):
         final_output = {
             'loss': decoder_output['loss'] + 6*salience_output['loss']
         }
+        # final_output = {
+        #     'loss': salience_output['loss']
+        # }
         if torch.isnan(final_output['loss']):
             raise ValueError("nan loss encountered")
         # Autodecoder using source_tokens
