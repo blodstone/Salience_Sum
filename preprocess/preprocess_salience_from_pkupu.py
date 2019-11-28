@@ -110,16 +110,18 @@ def main(args):
                         nlp_summ = nlp(summ.strip())
                         for doc_sent in nlp_doc.sents:
                             for summ_sent in nlp_summ.sents:
-                                if doc_sent.similarity(summ_sent) > 0.9:
+                                if doc_sent.has_vector and doc_sent.similarity(summ_sent) > 0.9:
                                     for t in doc_sent:
                                         result_labels[t.i] += 1
                 elif summ_group == 'AKE':
                     window = args.window
                     results = AKE.run(max_words, window, nlp_doc)
-                    result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
+                    assert len(results) == len(result_labels)
+                    result_labels = [result_labels[i] + results[i] for i, v in enumerate(result_labels)]
                 elif summ_group == 'NER':
                     results = NER.run(max_words, nlp_doc)
-                    result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
+                    assert len(results) == len(result_labels)
+                    result_labels = [result_labels[i] + results[i] for i, v in enumerate(result_labels)]
             new_docs = []
             for token, value in zip(nlp_doc, result_labels):
                 new_docs.append('{}|%|{}'.format(token.text, value))

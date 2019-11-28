@@ -20,10 +20,10 @@ def generate(input_path, output_path, type='doc'):
 
 
 if __name__ == '__main__':
-    file_path = '../data/bbc_highres'
+    file_path = '../data/bbc_allen'
     # i_paths = ['train.tsv', 'val.tsv']
     i_paths = ['test.tsv']
-    g_paths = [['submodular', 'textrank', 'centroid'], ['submodular_val', 'textrank_val', 'centroid_val']]
+    g_paths = [['submodular', 'textrank', 'centroid']]
     # doc_names = ['train', 'val']
     doc_names = ['test']
     output = '../../PKUSUMSUM/summs'
@@ -33,12 +33,12 @@ if __name__ == '__main__':
     output_gold = '../../PKUSUMSUM/gold'
     create_folder(output_gold)
     # Generate file for PKUSUM
-    for i_path, o_paths in zip(i_paths, g_paths):
-        for o_path in o_paths:
-            input_path = os.path.join(file_path, i_path)
-            output_path = os.path.join(output, o_path)
-            create_folder(output_path)
-            generate(input_path, output_path)
+    #for i_path, o_paths in zip(i_paths, g_paths):
+    #    for o_path in o_paths:
+    #        input_path = os.path.join(file_path, i_path)
+    #        output_path = os.path.join(output, o_path)
+    #        create_folder(output_path)
+    #        generate(input_path, output_path)
     # Generate docs and gold
     for i_path, doc_name in zip(i_paths, doc_names):
         input_path = os.path.join(file_path, i_path)
