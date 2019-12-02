@@ -6,9 +6,7 @@ from itertools import product
 
 import pandas as pd
 import spacy
-import ray
 import tqdm
-from allennlp.common import Tqdm
 
 from noisy_salience_model import AKE, NER, pkusumsum, gold
 
@@ -73,12 +71,6 @@ def process_results(results):
         df_scores[doc_idx] = df_score
     return df_scores
 
-def to_iterator(obj_ids):
-    while obj_ids:
-        done, obj_ids = ray.wait(obj_ids)
-        yield ray.get(done[0])
-
-@ray.remote
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
     print(doc_f)
@@ -128,7 +120,6 @@ def main(args):
     summs_path = args.summs_pku
     max_words = args.max_words
     index = {}
-    ray.init(object_store_memory=40*1e8)
     for name in set_name:
         index[name] = pickle.load(open(os.path.join(args.index, '{}_final_idx'.format(name)), 'rb'))
     summ_groups = []
@@ -157,7 +148,7 @@ def main(args):
         # gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
         # gold_files.sort(key=lambda x: x[1])
         doc_summ_pair = list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys())))
-        new_lines = ray.get([run.remote(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair])
+        new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
         write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
         write_file.writelines(new_lines)
         write_file.close()
