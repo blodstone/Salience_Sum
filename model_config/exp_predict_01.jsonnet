@@ -15,7 +15,7 @@ local PROJ=20;
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "/data/dev_bbc/train.dev.tsv.tagged",
+  "train_data_path": "data/dev_bbc/train.dev.tsv.tagged",
   "validation_data_path": "data/dev_bbc/val.dev.tsv.tagged",
   "model": {
     "type": "salience_seq2seq",
