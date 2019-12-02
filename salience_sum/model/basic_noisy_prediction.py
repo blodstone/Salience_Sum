@@ -71,7 +71,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self.projection = torch.nn.Linear(hidden_dim, proj_dim, bias=True)
         self.activation_1 = torch.nn.ReLU()
         self.regression = torch.nn.Linear(proj_dim, 1)
-        # self.activation_2 = torch.nn.LogSigmoid()
+        self.activation_2 = torch.nn.LogSigmoid()
         # with torch.no_grad():
         #     self.regression.weight.data = torch.nn.init.kaiming_normal_(
         #         torch.empty(1, hidden_dim), mode='fan_out', nonlinearity='leaky_relu')
@@ -88,7 +88,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         # shape: (batch_size, seq_len, 1)
         projection = self.activation_1(self.projection(encoder_out['encoder_outputs']))
         regression_output = self.regression(projection)
-        predicted_salience = regression_output.squeeze(dim=2)
+        predicted_salience = self.activation_2(regression_output.squeeze(dim=2))
         # predicted_salience = regression_output.squeeze(dim=2)
         self.loss = self.criterion(predicted_salience, salience_values)
         if torch.isnan(self.loss):
