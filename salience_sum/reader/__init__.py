@@ -1,1 +1,1 @@
-from salience_sum.reader.summ_reader import SummDataReader
+from salience_sum.reader.summ_data_reader import SummDataReader
