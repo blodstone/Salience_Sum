@@ -67,7 +67,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
                  bidirectional_input=False) -> None:
         super().__init__()
         self._bidirectional_input = bidirectional_input
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.BCELoss()
         self.projection = torch.nn.Linear(hidden_dim, proj_dim, bias=True)
         self.activation_1 = torch.nn.ReLU()
         self.regression = torch.nn.Linear(proj_dim, 1)
@@ -78,7 +78,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self.loss = torch.tensor([0])
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
-        return {"RMSE": self.loss.item()}
+        return {"BCE": self.loss.item()}
 
     def forward(self,
                 encoder_out: Dict[str, torch.LongTensor],
