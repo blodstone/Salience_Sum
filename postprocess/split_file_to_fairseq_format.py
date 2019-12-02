@@ -2,7 +2,7 @@ import os
 
 
 def process_set(split, folder_path):
-    file = os.path.join(folder_path, split + '.dev.tsv.tagged')
+    file = os.path.join(folder_path, split + '.tsv.tagged')
     with open(file) as f:
         srcs = []
         tgts = []
@@ -20,8 +20,8 @@ def process_set(split, folder_path):
 
 
 def main():
-    folder_path = '../data/dev_bbc'
-    splits = ['train', 'val']
+    folder_path = '../data/bbc_highres'
+    splits = ['test']
     for split in splits:
         process_set(split, folder_path)
 

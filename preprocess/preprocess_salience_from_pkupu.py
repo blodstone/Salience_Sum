@@ -10,8 +10,17 @@ from allennlp.common import Tqdm
 
 from noisy_salience_model import AKE, NER, pkusumsum, gold
 
-nlp = spacy.load("en_core_web_lg", disable=["textcat"])
+# nlp = spacy.load("en_core_web_lg", disable=["textcat"])
 
+def gen_doc_sum(document_path, summary_path, list_name):
+    # document_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/restbody'
+    # summary_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/firstsentence'
+    for name in list_name:
+        doc_f = name
+        summ_f = '{}.fs'.format(name.split('.')[0])
+        with open(os.path.join(document_path, doc_f)) as doc:
+            with open(os.path.join(summary_path, summ_f)) as summ:
+                yield doc.readlines(), doc_f, summ.readlines(), summ_f
 
 def retrieve(doc_path, summ_path):
     contents = []
@@ -68,6 +77,9 @@ def main(args):
     output_path = args.output
     summs_path = args.summs_pku
     max_words = args.max_words
+    index = {}
+    for name in set_name:
+        index[name] = pickle.load(open(os.path.join(args.index, '{}_final_idx'.format(name)), 'rb'))
     summ_groups = []
     summaries = {}
     # The folder name has to match these names
@@ -84,35 +96,36 @@ def main(args):
 
     for dataset in set_name:
         print('Processing Dataset {}'.format(dataset))
-        # Retrieve each document set and sort them
-        doc_path = os.path.join(docs_path, dataset)
-        doc_files = [(name, int(name.split('.')[0])) for name in os.listdir(doc_path)]
-        doc_files.sort(key=lambda x: x[1])
-
-        # Retrieve each gold set and sort them also
-        gold_path = os.path.join(golds_path, dataset)
-        gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
-        gold_files.sort(key=lambda x: x[1])
+        # # Retrieve each document set and sort them
+        # doc_path = os.path.join(docs_path, dataset)
+        # doc_files = [(name, int(name.split('.')[0])) for name in os.listdir(doc_path)]
+        # doc_files.sort(key=lambda x: x[1])
+        #
+        # # Retrieve each gold set and sort them also
+        # gold_path = os.path.join(golds_path, dataset)
+        # gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
+        # gold_files.sort(key=lambda x: x[1])
+        doc_summ_pair = gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))
         new_lines = []
-        for doc_set, gold_set in Tqdm.tqdm(zip(doc_files, gold_files)):
-            doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
-            gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
-            nlp_doc = nlp(doc)
+        for doc, doc_f, gold, gold_f in Tqdm.tqdm(doc_summ_pair):
+            # doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
+            # gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
+            # nlp_doc = nlp(doc)
             # Every token start with zero salience
-            result_labels = [0 for _ in nlp_doc]
+            result_labels = [0 for _ in doc]
             # Then iterate each summary group to add salience points
             for summ_group in summ_groups:
                 if summ_group in ['submodular', 'textrank', 'centroid']:
-                    summ_content = list(open(os.path.join(summs_path, dataset, summ_group, doc_set[0])).readlines())
+                    summ_content = list(open(os.path.join(
+                        summs_path, dataset, summ_group, index[dataset][doc_f])).readlines())
                     # Some system produce no summary, because the document has only one sentence
                     if len(summ_content) != 0:
-                        summ = summ_content[0]
-                        nlp_summ = nlp(summ.strip())
-                        for doc_sent in nlp_doc.sents:
-                            for summ_sent in nlp_summ.sents:
-                                if doc_sent.similarity(summ_sent) > 0.9:
-                                    for t in doc_sent:
-                                        result_labels[t.i] += 1
+                        for summ_sent in summ_content:
+                            for i, doc_sent in enumerate(doc):
+                                if doc_sent.replace(' ', '').replace('\n', '') \
+                                        == summ_sent.replace(' ', '').replace('\n', ''):
+                                    result_labels[i] += 1
+
                 elif summ_group == 'AKE':
                     window = args.window
                     results = AKE.run(max_words, window, nlp_doc)
@@ -164,6 +177,7 @@ if __name__ == '__main__':
     # -set train val -docs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs -golds_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/gold -summs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs -output /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_allen --submodular --centroid --textrank
     parser = argparse.ArgumentParser()
     parser.add_argument('-set', nargs='+', help='Input list of set names (the folder name has to match the same name).')
+    parser.add_argument('-index', help='Index for matching files.')
     parser.add_argument('-docs_pku', help='The path containing the document for each set.')
     parser.add_argument('-golds_pku', help='The path containing the gold summary for each set.')
     # We have a fixed set of summ folder name: submodular, centroid and textrank
