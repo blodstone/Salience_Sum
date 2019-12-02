@@ -117,7 +117,8 @@ class SalienceSeq2Seq(Model):
         # print("Salience loss: {}".format(decoder_output['loss']))
         # print("Decoder loss: {}".format(salience_output['loss']))
         final_output = {
-            'loss': decoder_output['loss'] + 6*salience_output['loss']
+            'loss': decoder_output['loss'] + 6 * salience_output['loss'],
+            'salience_output': salience_output,
         }
         # final_output = {
         #     'loss': salience_output['loss']

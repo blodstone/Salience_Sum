@@ -1,14 +1,15 @@
 '''
 Automated Keyword Retrieval using Textrank
 '''
-import pickle
+import nltk
 from collections import namedtuple
 
 import spacy
 import networkx as nx
 
+
 Labeled_Word = namedtuple('Labeled_Word', ['word', 'label', 'idx', 'sent_idx', 'score'])
-desired_pos = ['NOUN', 'ADJ']
+desired_pos = ['JJ', 'JJR', 'NN', 'NNS', 'NNP', 'NNPS', ]
 
 
 def create_labeled_doc(doc) -> list:
@@ -20,13 +21,15 @@ def create_labeled_doc(doc) -> list:
     '''
     result = []
     idx = sent_idx = 0
-    for sent in doc.sents:
+    for sent in doc:
         sent_idx += 1
-        for word in sent:
-            if word.pos_ in desired_pos:
-                result.append(Labeled_Word(word.lower_, 1, idx, sent_idx, 0))
+        set_tagged = nltk.pos_tag(sent.split())
+        for pair in set_tagged:
+            word, pos = pair
+            if pos in desired_pos:
+                result.append(Labeled_Word(word.lower(), 1, idx, sent_idx, 0))
             else:
-                result.append(Labeled_Word(word.lower_, 0, idx, sent_idx, 0))
+                result.append(Labeled_Word(word.lower(), 0, idx, sent_idx, 0))
             idx += 1
     return result
 
@@ -62,8 +65,7 @@ def run(max_words, window, doc):
     ranks = nx.pagerank(graph)
     top_n_ranks = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True)[:max_words])
     # Score keywords
-    i = 0
-    while i < len(labeled_doc):
+    for i, _ in enumerate(labeled_doc):
         if labeled_doc[i].word in top_n_ranks.keys():
             labeled_doc[i] = Labeled_Word(labeled_doc[i].word, 1,
                                           labeled_doc[i].idx, labeled_doc[i].sent_idx,
@@ -72,5 +74,4 @@ def run(max_words, window, doc):
             labeled_doc[i] = Labeled_Word(labeled_doc[i].word, 0,
                                           labeled_doc[i].idx, labeled_doc[i].sent_idx,
                                           -1)
-        i += 1
     return [labeled_word.label for labeled_word in labeled_doc]
