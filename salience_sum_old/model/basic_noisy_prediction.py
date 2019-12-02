@@ -71,7 +71,7 @@ class BasicNoisyPredictionModel(nn.Module, Registrable):
         self.projection = torch.nn.Linear(hidden_dim, proj_dim, bias=True)
         self.activation_1 = torch.nn.ReLU()
         self.regression = torch.nn.Linear(proj_dim, 1)
-        self.activation_2 = torch.nn.Sigmoid()
+        self.activation_2 = torch.nn.LogSigmoid()
         # with torch.no_grad():
         #     self.regression.weight.data = torch.nn.init.kaiming_normal_(
         #         torch.empty(1, hidden_dim), mode='fan_out', nonlinearity='leaky_relu')
