@@ -84,8 +84,8 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     # Then iterate each summary group to add salience points
     for summ_group in summ_groups:
         if summ_group in ['submodular', 'textrank', 'centroid']:
-            summ_content = list(open(os.path.join(
-                summs_path, dataset, summ_group, index[dataset][doc_f])).readlines())
+            summ_content = tqdm.tqdm(list(open(os.path.join(
+                summs_path, dataset, summ_group, index[dataset][doc_f])).readlines()))
             # Some system produce no summary, because the document has only one sentence
             if len(summ_content) != 0:
                 for summ_sent in summ_content:
