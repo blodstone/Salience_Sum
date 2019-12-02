@@ -1,8 +1,12 @@
-local HIDDEN=100;
-local EMBEDDING=50;
+local HIDDEN=50;
+local EMBEDDING=20;
+local FFHIDDEN=100;
+local PROJ=20;
 {
   "dataset_reader": {
     "type": "summdatareader",
+    "lazy": false,
+    "interpolation": false,
     "tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -17,19 +21,19 @@ local EMBEDDING=50;
     "type": "salience_seq2seq",
     "noisy_prediction": {
       "type": "basic_noisy_prediction",
-      "hidden_dim": HIDDEN
+      "hidden_dim": HIDDEN,
+      "proj_dim": PROJ,
     },
     "encoder": {
-        "type": "seq2seqwrapper",
-        "module": {
-          "type": "denoising_encoder",
-          "bidirectional": true,
-          "num_layers": 1,
-          "use_bridge": false,
-          "input_size": EMBEDDING,
-          "hidden_size": HIDDEN
-        },
-      },
+      "type": "stacked_self_attention",
+      "input_dim": EMBEDDING,
+      "hidden_dim": HIDDEN,
+      "projection_dim": PROJ,
+      "feedforward_hidden_dim": FFHIDDEN,
+      "num_attention_heads": 2,
+      "num_layers": 2,
+      "dropout_prob": 0.1
+    },
     "source_text_embedder": {
       "token_embedders": {
           "tokens": {
@@ -58,22 +62,25 @@ local EMBEDDING=50;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 8,
+    "batch_size" : 4,
+    "instances_per_epoch" : 100,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "histogram_interval": 1,
-    "num_epochs": 4,
-    "patience": 10,
+    "grad_norm": 5.0,
+    "grad_clipping": 1.0,
+    "summary_interval": 5,
+    "histogram_interval": 5,
+    "num_epochs": 5,
+    "patience": 1,
     "cuda_device": -1,
-    "grad_norm": 2,
+    "num_serialized_models_to_keep": 5,
     "optimizer": {
-      "type": "adagrad",
-      "lr": 0.15,
-      "initial_accumulator_value": 0.1
+      "type": "adam",
+      "lr": 0.01
     },
   },
   "vocabulary": {
-    "max_vocab_size": 10
+    "max_vocab_size": 50000
   }
 }

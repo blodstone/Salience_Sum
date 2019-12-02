@@ -32,7 +32,7 @@ class SummDataReader(DatasetReader):
                 yield self.text_to_instance(
                     [Token(token) for token in src_seq],
                     tgt_seq,
-                    [float(value) for value in salience_seq])
+                    [1.0 if float(value) > 0 else 0.0 for value in salience_seq])
 
     def smooth_and_norm(self, value):
         value_dict = {i: x for i, x in enumerate(value) if x != 0}
