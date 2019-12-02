@@ -73,7 +73,6 @@ def process_results(results):
 
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
-    print(doc_f)
     # print("Process doc {}".format(doc_f))
     # doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
     # gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
@@ -147,7 +146,7 @@ def main(args):
         # gold_path = os.path.join(golds_path, dataset)
         # gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
         # gold_files.sort(key=lambda x: x[1])
-        doc_summ_pair = list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys())))
+        doc_summ_pair = tqdm.tqdm(list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))))
         new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
         write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
         write_file.writelines(new_lines)

@@ -73,7 +73,6 @@ def process_results(results):
 
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
-    print(doc_f)
     # print("Process doc {}".format(doc_f))
     # doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
     # gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
@@ -84,8 +83,8 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     # Then iterate each summary group to add salience points
     for summ_group in summ_groups:
         if summ_group in ['submodular', 'textrank', 'centroid']:
-            summ_content = tqdm.tqdm(list(open(os.path.join(
-                summs_path, dataset, summ_group, index[dataset][doc_f])).readlines()))
+            summ_content = list(open(os.path.join(
+                summs_path, dataset, summ_group, index[dataset][doc_f])).readlines())
             # Some system produce no summary, because the document has only one sentence
             if len(summ_content) != 0:
                 for summ_sent in summ_content:
@@ -147,7 +146,7 @@ def main(args):
         # gold_path = os.path.join(golds_path, dataset)
         # gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
         # gold_files.sort(key=lambda x: x[1])
-        doc_summ_pair = list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys())))
+        doc_summ_pair = tqdm.tqdm(list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))))
         new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
         write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
         write_file.writelines(new_lines)
