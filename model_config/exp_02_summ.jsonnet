@@ -1,11 +1,12 @@
-local HIDDEN=100;
-local EMBEDDING=100;
-local FFHIDDEN=120;
-local PROJ=20;
+local HIDDEN=512;
+local EMBEDDING=256;
+local FFHIDDEN=2048;
+local PROJ=256;
 {
   "dataset_reader": {
     "type": "summdatareader",
     "lazy": false,
+    "interpolation": false,
     "tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -14,13 +15,14 @@ local PROJ=20;
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "../data/dev_bbc/train.dev.tsv.tagged.small",
-  "validation_data_path": "../data/dev_bbc/val.dev.tsv.tagged.small",
+  "train_data_path": "data/bbc_allen/train.tsv.tagged",
+  "validation_data_path": "data/bbc_allen/val.tsv.tagged",
   "model": {
     "type": "salience_seq2seq",
     "noisy_prediction": {
       "type": "basic_noisy_prediction",
-      "hidden_dim": HIDDEN
+      "hidden_dim": HIDDEN,
+      "proj_dim": PROJ,
     },
     "encoder": {
       "type": "stacked_self_attention",
@@ -28,7 +30,7 @@ local PROJ=20;
       "hidden_dim": HIDDEN,
       "projection_dim": PROJ,
       "feedforward_hidden_dim": FFHIDDEN,
-      "num_attention_heads": 4,
+      "num_attention_heads": 8,
       "num_layers": 4,
       "dropout_prob": 0.1
     },
@@ -47,37 +49,38 @@ local PROJ=20;
          "decoding_dim": HIDDEN,
          "target_embedding_dim": EMBEDDING
       },
-      "max_decoding_steps": 400,
+      "max_decoding_steps": 90,
       "target_namespace": "tokens",
       "target_embedder": {
         "vocab_namespace": "tokens",
         "embedding_dim": EMBEDDING
       },
-      "scheduled_sampling_ratio": 0.8,
+      "scheduled_sampling_ratio": 0.9,
       "beam_size": 5
     }
   },
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 8,
+    "batch_size" : 12,
     "instances_per_epoch" : 100000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "grad_norm": 2.0,
-    "summary_interval": 5000,
-    "histogram_interval": 10000,
-    "num_epochs": 30,
+    "grad_norm": 5.0,
+    "grad_clipping": 1.0,
+    "summary_interval": 500,
+    "histogram_interval": 1000,
+    "num_epochs": 50,
     "patience": 10,
-    "cuda_device": -1,
+    "cuda_device": 0,
     "num_serialized_models_to_keep": 5,
     "optimizer": {
       "type": "adam",
-      "lr": 0.15
+      "lr": 0.01
     },
   },
   "vocabulary": {
-    "max_vocab_size": 80000
+    "max_vocab_size": 50000
   }
 }
