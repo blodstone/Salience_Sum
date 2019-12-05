@@ -109,7 +109,7 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     new_docs = []
     for token, value in zip(tokens, result_labels):
         new_docs.append('{}|%|{}'.format(token, value))
-    return '{}\t{}\n'.format(' '.join(new_docs), gold)
+    return '{}\t{}\n'.format(' '.join(new_docs), gold[0].strip().lower())
 
 def main(args):
     set_name = args.set
@@ -148,7 +148,7 @@ def main(args):
         # gold_files.sort(key=lambda x: x[1])
         doc_summ_pair = tqdm.tqdm(list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))))
         new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
-        write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
+        write_file = open(dataset + '.tsv.tagged', 'w')
         write_file.writelines(new_lines)
         write_file.close()
     # src_folder = args.src
