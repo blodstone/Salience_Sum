@@ -128,7 +128,7 @@ class EncoderDecoder(Model):
                 loss_vocab = -class_log_probs[b][l][gold_token]
                 loss_copy = -sum(attentions[l][b].index_select(0, idxs).log())
                 loss += p_gens[l][b][0] * loss_vocab + \
-                        (torch.tensor([1]) - p_gens[l][b][0]) * loss_copy + loss_coverage
+                        (1 - p_gens[l][b][0]) * loss_copy + loss_coverage
                 num_item += 1
 
         return loss / num_item
