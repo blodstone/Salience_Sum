@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Any
 
 import torch
 from allennlp.common import Registrable
@@ -44,20 +44,18 @@ class Decoder(Module, Registrable):
         pass
 
     def forward(self, embedded_tgt: torch.Tensor,
-                final_state: Tuple[torch.Tensor, torch.Tensor],
-                states: torch.Tensor) -> Tuple[List[torch.Tensor],
-                                               List[torch.Tensor],
-                                               List[torch.Tensor]]:
+                state: Dict[str, torch.Tensor]) -> Tuple[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]]]:
+        states = state['encoder_states']
         # A static context c for all time-steps
         final_state = (
-            final_state[0].transpose(0, 1).contiguous(),
-            final_state[1].transpose(0, 1).contiguous()
+            state['encoder_final_state'].transpose(0, 1).contiguous(),
+            state['encoder_context'].transpose(0, 1).contiguous()
         )
         dec_states = []
         p_gens = []
         attentions = []
         coverages = []
-        coverage = torch.zeros(states.size(0), states.size(1), 1)
+        coverage = states.new_zeros((states.size(0), states.size(1), 1))
         for step, emb in enumerate(embedded_tgt.split(1, 1)):
             dec_state, final_state = self._rnn(
                 emb,
@@ -72,7 +70,13 @@ class Decoder(Module, Registrable):
             coverages.append(coverage)
             dec_states.append(dec_state)
             p_gens.append(p_gen)
-        return dec_states, p_gens, attentions, coverages
+        state['decoder_states'] = torch.stack(dec_states, dim=1).squeeze(2)
+        meta_state = {
+            'p_gens': p_gens,
+            'attentions': attentions,
+            'coverages': coverages
+        }
+        return state, meta_state
 
     def post_process(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         pass

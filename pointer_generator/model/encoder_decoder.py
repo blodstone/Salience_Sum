@@ -1,10 +1,10 @@
-from typing import Dict
+from typing import Dict, Tuple, List
 
 import torch
 from allennlp.data import Vocabulary
 from allennlp.models import Model
 from allennlp.modules import TextFieldEmbedder
-from allennlp.nn import RegularizerApplicator
+from allennlp.nn import RegularizerApplicator, util
 from allennlp.nn.beam_search import BeamSearch
 from torch.nn import Sequential, Linear, LogSoftmax, CrossEntropyLoss
 
@@ -48,18 +48,30 @@ class EncoderDecoder(Model):
         :return: The loss and prediction of the model
         """
         # TODO: make _make_predictions
-        states, final_state = self._encode(source_tokens)
-        dec_states, p_gens, attentions, coverages = self._decode(target_tokens, states, final_state)
-        loss = self._compute_loss(
-            dec_states, p_gens, attentions, coverages, target_tokens, source_tokens)
+        state = self._encode(source_tokens)
+        state, meta_state = self._decode(target_tokens, state)
+        loss = self._compute_loss(source_tokens, target_tokens, state, meta_state)
         if not self.training:
-            predictions = self._make_predictions(dec_states, final_state)
+            pass
+            # state = {
+            #     'source_mask': None,
+            #     'encoder_outputs': ,
+            #     'decoder_hidden': None,
+            #     'decoder_context': None
+            # }
+            # predictions = self._make_predictions(dec_states, final_state)
         return {
             "loss": loss,
             # "predictions": predictions
         }
 
-    def _encode(self, source_tokens: Dict[str, torch.Tensor]):
+    # def take_step(self, last_predictions: torch.Tensor,
+    #               state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    #     self._decode(last_predictions)
+    #     class_log_probs = self._generator(dec_states)
+    #     return class_log_probs, state
+
+    def _encode(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
         Encode the source tokens
 
@@ -68,11 +80,19 @@ class EncoderDecoder(Model):
         """
         # (Batch, Seq, Emb Dim)
         embedded_src = self._embedder(source_tokens)
+        source_mask = util.get_text_field_mask(source_tokens)
         # (Batch, Seq, Num Direction * Hidden), final_state = (last state, last context)
         states, final_state = self._encoder(embedded_src)
-        return states, final_state
+        state = {
+            'encoder_states': states,
+            'encoder_final_state': final_state[0],
+            'encoder_context': final_state[1],
+            'source_mask': source_mask
+        }
+        return state
 
-    def _decode(self, target_tokens, states, final_state):
+    def _decode(self, target_tokens: Dict[str, torch.Tensor],
+                state: Dict[str, torch.Tensor]) -> Tuple[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]]]:
         """
         Decode the encoder state
         :param target_tokens: The indexes of target tokens
@@ -81,16 +101,19 @@ class EncoderDecoder(Model):
         :return: The output of decoder, attentions and last decoding state
         """
         embedded_tgt = self._embedder(target_tokens)
-        dec_states, p_gens, attentions, coverages = self._decoder(embedded_tgt, final_state, states)
-        return dec_states, p_gens, attentions, coverages
+        state, meta_state = self._decoder(embedded_tgt, state)
+        return state, meta_state
 
-    def _compute_loss(self,
-                      dec_states, p_gens,
-                      attentions, coverages,
-                      target_tokens, source_tokens):
+    def _compute_loss(self, source_tokens: Dict[str, torch.Tensor],
+                      target_tokens: Dict[str, torch.Tensor],
+                      state: Dict[str, torch.Tensor],
+                      meta_state: Dict[str, List[torch.Tensor]]):
         tgt = target_tokens['tokens']
         src = source_tokens['tokens']
-        dec_states = torch.stack(dec_states, dim=1).squeeze(2)
+        dec_states = state['decoder_states']
+        attentions = meta_state['attentions']
+        coverages = meta_state['coverages']
+        p_gens = meta_state['p_gens']
         # (B, L, V)
         class_log_probs = self._generator(dec_states)
         batch_size = class_log_probs.size(0)
@@ -105,7 +128,7 @@ class EncoderDecoder(Model):
                 loss_vocab = -class_log_probs[b][l][gold_token]
                 loss_copy = -sum(attentions[l][b].index_select(0, idxs).log())
                 loss += p_gens[l][b][0] * loss_vocab + \
-                        (1 - p_gens[l][b][0]) * loss_copy + loss_coverage
+                        (torch.tensor([1]) - p_gens[l][b][0]) * loss_copy + loss_coverage
                 num_item += 1
 
         return loss / num_item
