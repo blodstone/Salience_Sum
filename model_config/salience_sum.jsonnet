@@ -2,15 +2,17 @@ local HIDDEN=256;
 local EMBEDDING=128;
 {
   "dataset_reader": {
-    "type": "summdatareader",
+    "type": "salience_summdatareader",
     "lazy": false,
     "interpolation": false,
+    "use_salience": true,
     "source_max_tokens": 400
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged",
-  "validation_data_path": "data/bbc_allen/validation.tsv.tagged",
+  "train_data_path": "data/bbc_allen/train.tsv.tagged.small",
+  "validation_data_path": "data/bbc_allen/validation.tsv.tagged.small",
   "model": {
-    "type": "encoder_decoder",
+    "type": "salience_sum",
+    "dropout": 0.2,
     "max_target_size": 100,
     "beam_size": 5,
     "encoder": {
@@ -41,7 +43,7 @@ local EMBEDDING=128;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 32,
+    "batch_size" : 16,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
