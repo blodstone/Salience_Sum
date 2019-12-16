@@ -6,8 +6,8 @@ from allennlp.data.iterators import BasicIterator, BucketIterator
 from allennlp.data.tokenizers import WordTokenizer
 from allennlp.data.tokenizers.word_splitter import JustSpacesWordSplitter
 
-from salience_sum.predictor import Predictor
-from salience_sum.reader.summ_data_reader import SummDataReader
+from salience_sum_old.predictor import Predictor
+from salience_sum_old.reader.summ_data_reader import SummDataReader
 
 vocab_path = 'data/dev_bbc/vocab'
 # iterate over the dataset without changing its order

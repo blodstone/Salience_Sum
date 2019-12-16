@@ -13,10 +13,10 @@ from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.training import Trainer
 from torch import optim
 
-from salience_sum.model import BasicNoisyPredictionModel
-from salience_sum.model import DenoisingEncoder
-from salience_sum.model.salience_model import SalienceSeq2Seq
-from salience_sum.reader import SummDataReader
+from salience_sum_old.model import BasicNoisyPredictionModel
+from salience_sum_old.model import DenoisingEncoder
+from salience_sum_old.model.salience_model import SalienceSeq2Seq
+from salience_sum_old.reader import SummDataReader
 
 if __name__ == '__main__':
     """
