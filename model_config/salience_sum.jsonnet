@@ -8,8 +8,8 @@ local EMBEDDING=128;
     "use_salience": true,
     "source_max_tokens": 400
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged.small",
-  "validation_data_path": "data/bbc_allen/validation.tsv.tagged.small",
+  "train_data_path": "data/bbc_allen/train.tsv.tagged",
+  "validation_data_path": "data/bbc_allen/validation.tsv.tagged",
   "model": {
     "type": "salience_sum",
     "dropout": 0.2,
@@ -43,7 +43,7 @@ local EMBEDDING=128;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 16,
+    "batch_size" : 12,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
