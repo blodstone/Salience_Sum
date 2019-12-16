@@ -41,16 +41,16 @@ local EMBEDDING=128;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 16,
+    "batch_size" : 32,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "summary_interval": 1,
-    "histogram_interval": 1,
-    "num_epochs": 2,
-    "patience": 1,
-    "cuda_device": -1,
-    "num_serialized_models_to_keep": 1,
+    "summary_interval": 500,
+    "histogram_interval": 1000,
+    "num_epochs": 40,
+    "patience": 10,
+    "cuda_device": 0,
+    "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",

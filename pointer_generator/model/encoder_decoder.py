@@ -33,17 +33,13 @@ class EncoderDecoder(Model):
         self._decoder = decoder
         self._decoder.add_vocab(self.vocab)
         # self._beam_search = BeamSearch(self._end_index, max_steps=self._max_target_size, beam_size=self._beam_size)
-        self._generator = Sequential(
-            Linear(self.hidden_size, vocab.get_vocab_size()),
-            LogSoftmax(dim=2)
-        )
         padding_idx = self.vocab.get_token_to_index_vocabulary()[self.vocab._padding_token]
         self._criterion = NLLLoss(
             reduction='sum', ignore_index=padding_idx)
 
     def forward(self, source_tokens: Dict[str, torch.Tensor],
                 target_tokens: Dict[str, torch.Tensor]) \
-            -> Dict[str, float]:
+            -> Dict[str, torch.Tensor]:
         """
         The forward function of the encoder and decoder model
 
@@ -126,7 +122,7 @@ class EncoderDecoder(Model):
             loss += self._criterion(class_log_probs[b], target_tokens['tokens'][b])
         coverage_loss = torch.min(attentions, coverages).sum()
         total_loss = loss + coverage_loss
-        return total_loss
+        return total_loss / batch_size
 
     def _make_predictions(self, dec_states, final_state):
 

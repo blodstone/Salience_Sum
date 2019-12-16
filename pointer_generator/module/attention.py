@@ -14,12 +14,12 @@ class Attention(Module, Registrable):
         self._linear_coverage = Linear(1, hidden_size * 2, bias=False)
         self._v = Linear(hidden_size * 2, 1, bias=False)
         self._softmax = Softmax(dim=2)
-        self._reduce = Linear(hidden_size * 2, hidden_size, bias=False)
         self._context = Linear(hidden_size * 3, hidden_size, bias=True)
 
     def score(self, query: torch.Tensor, states: torch.Tensor, coverage: torch.Tensor) -> torch.Tensor:
         """
         Bahdanau attention
+        :param coverage: The coverage of all the previous steps (dim: H)
         :param query: The decoder states (dim: H)
         :param states: The encoder states (dim: 2H)
         :return: The alignment between query and source un-normalized
