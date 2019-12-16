@@ -57,28 +57,20 @@ class AutoDecoder(Module, Registrable):
             state['encoder_final_state'].transpose(0, 1).contiguous(),
             state['encoder_context'].transpose(0, 1).contiguous()
         )
-        class_log_probs = []
-        scores = []
         # (B, L_src, 1)
-        for step, emb in enumerate(embedded_src.split(1, 1)):
-            dec_state, final_state = self._rnn(
-                emb,
-                final_state
-            )
-            context, attention_hidden, attention = self._attention(
-                dec_state, states, source_mask)
-            # (B x Vocab)
-            vocab_dist = self._gen_vocab_dist(dec_state).squeeze(1)
-            # (B x 1 x Vocab)
-            final_dist = vocab_dist
-            class_log_prob = (final_dist + 1e-20).log()
-            class_log_probs.append(class_log_prob)
-            dec_state = attention_hidden
-            score = self._score_MLP(dec_state)
-            scores.append(score)
-        state['class_log_probs'] = torch.stack(class_log_probs, dim=1).squeeze(2)
+        dec_state, final_state = self._rnn(
+            embedded_src,
+            final_state
+        )
+        context, attention_hidden, attention = self._attention(
+            dec_state, states, source_mask)
+        vocab_dist = self._gen_vocab_dist(attention_hidden).squeeze(1)
+        final_dist = vocab_dist
+        scores = self._score_MLP(attention_hidden)
+        class_log_probs = (final_dist + 1e-20).log()
+        state['class_log_probs'] = class_log_probs
         meta_state = {
-            'scores': torch.stack(scores, dim=1).squeeze(2)
+            'scores': scores
         }
         return state, meta_state
 
