@@ -95,7 +95,8 @@ class EncoderDecoder(Model):
     def _decode(self,
                 source_tokens: Dict[str, torch.Tensor],
                 target_tokens: Dict[str, torch.Tensor],
-                state: Dict[str, torch.Tensor]) -> Tuple[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]]]:
+                state: Dict[str, torch.Tensor]) -> \
+            Tuple[Dict[str, torch.Tensor], Dict[str, List[torch.Tensor]]]:
         """
         Decode the encoder state
         :param target_tokens: The indexes of target tokens

@@ -55,7 +55,7 @@ if __name__ == '__main__':
     decoder = AutoRegressiveSeqDecoder(
         max_decoding_steps=MAX_SOURCE, target_namespace='tokens',
         target_embedder=embedding, beam_size=5, decoder_net=decoder_net, vocab=vocab)
-    noisy_prediction = BasicNoisyPredictionModel(vocab=vocab, hidden_dim=HIDDEN_DIM)
+    noisy_prediction = BasicNoisyPredictionModel(proj_dim=100, hidden_dim=HIDDEN_DIM)
     model = SalienceSeq2Seq(noisy_prediction=noisy_prediction, encoder=encoder, decoder=decoder, vocab=vocab, source_text_embedder=embedder)
 
     """
