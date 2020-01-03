@@ -11,7 +11,7 @@ from allennlp.predictors import Predictor
 from overrides import overrides
 from tqdm import tqdm
 
-from pointer_generator.reader import SummDataReader
+from pointer_generator_salience.reader.summ_reader import SummDataReader
 
 
 class Seq2SeqPredictor:
