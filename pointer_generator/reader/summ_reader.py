@@ -7,8 +7,7 @@ from allennlp.data.token_indexers import SingleIdTokenIndexer
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from scipy.interpolate import CubicSpline
 
-from pointer_generator.data.copy_field import CopyField
-from pointer_generator.data.token_indexers import CopySourceSingleIdTokenIndexer
+from pointer_generator.reader.copy_field import CopyField
 
 
 @DatasetReader.register("summdatareader")
