@@ -23,8 +23,8 @@ class EncoderDecoder(Model):
     def __init__(self,
                  source_embedder: TextFieldEmbedder,
                  target_embedder: TextFieldEmbedder,
-                 salience_lambda: int,
-                 coverage_lambda: int,
+                 salience_lambda: float,
+                 coverage_lambda: float,
                  max_steps: int,
                  encoder: Encoder,
                  decoder: Decoder,
@@ -35,6 +35,8 @@ class EncoderDecoder(Model):
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
         # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
+        self.coverage_lambda = coverage_lambda
+        self.salience_lambda = salience_lambda
         self.max_steps = max_steps
         self.hidden_size = hidden_size
         self.source_embedder = source_embedder

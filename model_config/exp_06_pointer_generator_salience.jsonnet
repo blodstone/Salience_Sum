@@ -21,6 +21,8 @@ local CUDA=0;
       "bidirectional": true
     },
     "teacher_force_ratio": 0.7,
+    "coverage_lambda": 1.0,
+    "salience_lambda": 0.7,
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
