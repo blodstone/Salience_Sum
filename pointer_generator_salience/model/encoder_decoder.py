@@ -94,7 +94,11 @@ class EncoderDecoder(Model):
         :return: The loss and prediction of the model
         """
         state = self._encode(source_tokens)
-        predicted_salience = self._predict_salience(state)
+        if self.salience_lambda == 0.0:
+            with torch.no_grad():
+                predicted_salience = self._predict_salience(state)
+        else:
+            predicted_salience = self._predict_salience(state)
         output_dict = {}
 
         if target_tokens:
