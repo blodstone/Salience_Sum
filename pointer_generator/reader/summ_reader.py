@@ -1,10 +1,14 @@
 from typing import Optional, Iterable, List
 
 import numpy as np
-from allennlp.data import DatasetReader, Tokenizer, Instance, Token
-from scipy.interpolate import CubicSpline
-from allennlp.data.fields import TextField, ArrayField
+from allennlp.data import DatasetReader, Instance, Token
+from allennlp.data.fields import TextField, ArrayField, MetadataField
 from allennlp.data.token_indexers import SingleIdTokenIndexer
+from allennlp.common.util import START_SYMBOL, END_SYMBOL
+from scipy.interpolate import CubicSpline
+
+from pointer_generator.data.copy_field import CopyField
+from pointer_generator.data.token_indexers import CopySourceSingleIdTokenIndexer
 
 
 @DatasetReader.register("summdatareader")
@@ -14,9 +18,11 @@ class SummDataReader(DatasetReader):
                  source_max_tokens: Optional[int] = None,
                  target_max_tokens: Optional[int] = None,
                  interpolation: bool = False,
+                 predict: bool = True,
                  use_salience: bool = False,
                  lazy: bool = False) -> None:
         super().__init__(lazy)
+        self._predict = predict
         self._source_max_tokens = source_max_tokens
         self._target_max_tokens = target_max_tokens
         self._interpolation = interpolation
@@ -29,6 +35,8 @@ class SummDataReader(DatasetReader):
         if self._use_salience:
             return [Token(token) for token in src_seq], [Token(token) for token in tgt_seq.split()],\
                    [1.0 if float(value) > 0 else 0.0 for value in salience_seq]
+        elif self._predict:
+            return [Token(token) for token in src_seq],
         else:
             return [Token(token) for token in src_seq], [Token(token) for token in tgt_seq.split()]
 
@@ -46,26 +54,40 @@ class SummDataReader(DatasetReader):
         c = [float(cs(i)) if i in value_dict.keys() else cs(i) * cs(i) for i in range(len(value))]
         return c
 
-    def text_to_instance(self, src_seq: List[Token], tgt_seq: List[Token],
+    @staticmethod
+    def text_to_ids(tokens):
+        ids = {}
+        out = []
+        for token in tokens:
+            out.append(ids.setdefault(token.text.lower(), len(ids)+1))
+        return out
+
+    def text_to_instance(self, src_seq: List[Token], tgt_seq: List[Token] = None,
                          salience_seq: Iterable[float] = None) -> Instance:
-        indexer = SingleIdTokenIndexer(lowercase_tokens=True,
-                                       start_tokens=['<s>'], end_tokens=['</s>'])
+        indexer = SingleIdTokenIndexer(lowercase_tokens=True)
+
         tokenized_src = src_seq[:self._source_max_tokens]
-        tokenized_tgt = tgt_seq[:self._target_max_tokens]
+
         source_field = TextField(tokenized_src, {'tokens': indexer})
-        target_field = TextField(tokenized_tgt, {'tokens': indexer})
+        source_text_field = MetadataField(metadata=tokenized_src)
+        source_ids_field = CopyField(tokenized_src)
+            # ArrayField(np.array(self.text_to_ids(tokenized_src)))
+        output_field = {
+            'source_tokens': source_field,
+            'source_text': source_text_field,
+            'source_ids': source_ids_field,
+        }
+        if tgt_seq:
+            tokenized_tgt = [Token(START_SYMBOL)] + \
+                            tgt_seq[:self._target_max_tokens] + \
+                            [Token(END_SYMBOL)]
+            # Source and target are sharing vocabulary
+            target_field = TextField(tokenized_tgt, {'tokens': indexer})
+            output_field['target_tokens'] = target_field
         if salience_seq:
             if self._interpolation:
                 saliency_field = ArrayField(np.array(self.smooth_and_norm(salience_seq)[:self._source_max_tokens]))
             else:
                 saliency_field = ArrayField(np.array(salience_seq[:self._source_max_tokens]))
-            return Instance({
-                'source_tokens': source_field,
-                'target_tokens': target_field,
-                'salience_values': saliency_field
-            })
-        else:
-            return Instance({
-                'source_tokens': source_field,
-                'target_tokens': target_field,
-            })
+            output_field['salience_values'] = saliency_field
+        return Instance(output_field)

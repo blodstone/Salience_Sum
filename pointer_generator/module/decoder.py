@@ -1,9 +1,8 @@
-from typing import Dict, Tuple, List, Any
-
 import torch
 from allennlp.common import Registrable
 from allennlp.data import Vocabulary
-from torch.nn import LSTM, Module, Sequential, Linear, Tanh, Sigmoid, Softmax
+from torch.nn import Module, LSTM, Sequential, Linear, Sigmoid, Softmax, ReLU, Dropout
+from typing import Dict, Tuple, Union
 
 from pointer_generator.module.attention import Attention
 
@@ -13,8 +12,8 @@ class Decoder(Module, Registrable):
     def __init__(self,
                  input_size: int,
                  hidden_size: int,
-                 attention: Attention,
                  num_layers: int,
+                 attention: Attention = None,
                  training: bool = True) -> None:
         super().__init__()
         self.vocab = None
@@ -22,22 +21,31 @@ class Decoder(Module, Registrable):
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.input_size = input_size
-        self._attention = attention
-        self._rnn = LSTM(input_size=self.input_size,
-                         hidden_size=self.hidden_size,
-                         num_layers=self.num_layers,
-                         batch_first=True)
-        self._p_gen = Sequential(
-            Linear(2 * self.hidden_size + self.hidden_size + self.input_size, 1, bias=True),
-            Sigmoid()
-        )
-        self._gen_vocab_dist = None
+        if attention is None:
+            self.is_attention = False
+            self.rnn = LSTM(input_size=self.input_size,
+                            hidden_size=self.hidden_size,
+                            num_layers=self.num_layers,
+                            batch_first=True)
+        else:
+            self.is_attention = True
+            self.attention = attention
+            self.rnn = LSTM(input_size=self.hidden_size + self.input_size,
+                            hidden_size=self.hidden_size,
+                            num_layers=self.num_layers,
+                            batch_first=True)
+            self._p_gen = Sequential(
+                Linear(self.hidden_size + self.hidden_size + self.input_size, 1, bias=True),
+                Sigmoid()
+            )
+        self.gen_vocab_dist = None
 
     def add_vocab(self, vocab: Vocabulary):
         self.vocab = vocab
-        self._gen_vocab_dist = Sequential(
-            Linear(self.hidden_size, self.vocab.get_vocab_size()),
-            Softmax(dim=2)
+        self.gen_vocab_dist = Sequential(
+            Linear(self.hidden_size, self.hidden_size, bias=True),
+            ReLU(),
+            Linear(self.hidden_size, self.vocab.get_vocab_size())
         )
 
     def get_output_dim(self) -> int:
@@ -46,57 +54,68 @@ class Decoder(Module, Registrable):
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
         pass
 
-    def forward(self, source_tokens: Dict[str, torch.Tensor],
-                embedded_tgt: torch.Tensor,
-                state: Dict[str, torch.Tensor]) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+    def forward(self,
+                input_emb: torch.Tensor,
+                state: Dict[str, Union[torch.Tensor, Tuple, Dict[str, torch.Tensor]]]):
+        source_ids = state['source_ids']
+        max_oov = state['max_oov']
         states = state['encoder_states']
+        hidden = state['hidden']
+        context = state['context']
+        dec_state = state['dec_state']
         source_mask = state['source_mask']
-        # Initial decoder state
-        final_state = (
-            state['encoder_final_state'].transpose(0, 1).contiguous(),
-            state['encoder_context'].transpose(0, 1).contiguous()
-        )
-        dec_states = []
-        p_gens = []
-        attentions = []
-        class_log_probs = []
-        coverages = []
-        # (B, L_src, 1)
-        coverage = states.new_zeros((states.size(0), states.size(1), 1))
-        for step, emb in enumerate(embedded_tgt.split(1, 1)):
-            dec_state, final_state = self._rnn(
-                emb,
-                final_state
-            )
-
-            context, attention_hidden, coverage, attention = self._attention(
+        coverage = state['coverage']
+        if len(input_emb.size()) == 2:
+            input_emb = input_emb.unsqueeze(1)
+        batch_size = input_emb.size(0)
+        hidden_context = None
+        attention = None
+        if self.is_attention:
+            # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
+            hidden_context, coverage, attention = self.attention(
                 dec_state, states, source_mask, coverage)
+            state['class_logits'] = self._build_class_logits(
+                attention, hidden_context, dec_state, input_emb, source_ids, max_oov)
+            input_tensor = torch.cat([hidden_context, input_emb], dim=2)
+        else:
+            state['class_logits'] = self._build_class_logits_no_attn(dec_state)
+            input_tensor = input_emb
+        dec_state, final = self.rnn(
+            input_tensor,
+            (hidden.view(-1, batch_size, self.hidden_size),
+             context.view(-1, batch_size, self.hidden_size))
+        )
+        state['dec_state'] = dec_state
+        state['coverage'] = coverage
+        state['attention'] = attention
+        state['hidden'] = final[0].view(batch_size, -1, self.hidden_size)
+        state['context'] = final[1].view(batch_size, -1, self.hidden_size)
+        return state
 
-            # (B x 1 x 1)
-            p_gen = self._p_gen(torch.cat((context, dec_state, emb), dim=2))
-            # (B x Vocab)
-            vocab_dist = (p_gen * self._gen_vocab_dist(attention_hidden)).squeeze(1)
-            # (B x L_src)
-            attn_dist = ((1 - p_gen) * attention).squeeze(2)
-            # (B x 1 x Vocab)
-            final_dist = vocab_dist.scatter_add(1, source_tokens['tokens'], attn_dist).unsqueeze(1)
-            class_log_prob = (final_dist + 1e-20).log()
-            class_log_probs.append(class_log_prob)
+    def _build_class_logits(self,
+                            attention: torch.Tensor,
+                            hidden_context: torch.Tensor,
+                            dec_state: torch.Tensor,
+                            input_emb: torch.Tensor,
+                            source_ids: torch.Tensor,
+                            max_oov: torch.Tensor
+                            ) -> torch.Tensor:
+        p_gen = self._p_gen(torch.cat((hidden_context, dec_state, input_emb), dim=2))
+        vocab_dist = (p_gen * self.gen_vocab_dist(hidden_context)).squeeze(1)
+        if (max_oov.max()+1).item() > self.vocab.get_vocab_size():
+            extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max()+1])
+            extended_vocab[:, :vocab_dist.size(1)] = vocab_dist
+        else:
+            extended_vocab = vocab_dist
+        attn_dist = ((1 - p_gen) * attention).squeeze(2)
+        final_dist = extended_vocab.scatter_add(1, source_ids, attn_dist).unsqueeze(1)
+        # some logits might zero
 
-            dec_state = attention_hidden
-            dec_states.append(dec_state)
+        class_logits = final_dist + 1e-13
+        return class_logits
 
-            attentions.append(attention)
-            coverages.append(coverage)
-            p_gens.append(p_gen)
-        state['decoder_states'] = torch.stack(dec_states, dim=1).squeeze(2)
-        state['class_log_probs'] = torch.stack(class_log_probs, dim=1).squeeze(2)
-        meta_state = {
-            'p_gens': torch.stack(p_gens, dim=1).squeeze(2),
-            'attentions': torch.stack(attentions, dim=1).squeeze(2),
-            'coverages': torch.stack(coverages, dim=1).squeeze(2),
-        }
-        return state, meta_state
-
-    def post_process(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        pass
+    def _build_class_logits_no_attn(self,
+                                    dec_state: torch.Tensor,
+                                    ) -> torch.Tensor:
+        class_logits = self.gen_vocab_dist(dec_state).squeeze(1)
+        return class_logits

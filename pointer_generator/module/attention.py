@@ -2,19 +2,28 @@ from typing import Any, Tuple
 
 import torch
 from allennlp.common import Registrable
-from torch.nn import Module, Sequential, Linear, Tanh, Softmax
+from torch.nn import Module, Sequential, Linear, Tanh, Softmax, ReLU
 
 
 class Attention(Module, Registrable):
-    def __init__(self, hidden_size: int) -> None:
+    def __init__(self, hidden_size: int, bidirectional: bool) -> None:
         super().__init__()
+        if bidirectional:
+            self.num_directions = 2
+        else:
+            self.num_directions = 1
         self.hidden = hidden_size
-        self._linear_query = Linear(hidden_size, hidden_size * 2, bias=True)
-        self._linear_source = Linear(hidden_size * 2, hidden_size * 2, bias=False)
-        self._linear_coverage = Linear(1, hidden_size * 2, bias=False)
-        self._v = Linear(hidden_size * 2, 1, bias=False)
+        # The query is cat[emb, attn_hidden]
+        self._linear_query = Linear(hidden_size, hidden_size, bias=True)
+        self._linear_source = Linear(hidden_size * self.num_directions, hidden_size, bias=False)
+        self._linear_context = Sequential(
+            Linear(hidden_size * self.num_directions + hidden_size, hidden_size, bias=True),
+            ReLU(),
+            Linear(hidden_size, hidden_size),
+        )
+        self._linear_coverage = Linear(1, hidden_size, bias=False)
+        self._v = Linear(hidden_size, 1, bias=False)
         self._softmax = Softmax(dim=2)
-        self._context = Linear(hidden_size * 3, hidden_size, bias=True)
 
     def score(self, query: torch.Tensor, states: torch.Tensor, coverage: torch.Tensor) -> torch.Tensor:
         """
@@ -27,7 +36,7 @@ class Attention(Module, Registrable):
         batch_size = states.size(0)
         tgt_length = query.size(1)
         src_length = states.size(1)
-        dim = states.size(2)
+        dim = query.size(2)
         # The formula: v.tanh(Wh*hi + Ws*st + b)
         # (B x L_tgt x H) -> (B x L_tgt x 2H)
         query_features = self._linear_query(query)
@@ -60,7 +69,7 @@ class Attention(Module, Registrable):
                 states: torch.Tensor,
                 source_mask: torch.Tensor,
                 coverage: torch.Tensor) \
-            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculating the attention using Bahdanau approach
 
@@ -76,11 +85,11 @@ class Attention(Module, Registrable):
         alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(1), float('-inf'))
         attentions = self._softmax(alignments)
         # (B, L_tgt, L_src) X (B, L_src, 2*H) = (B, L_tgt, 2*H)
-        context = torch.bmm(attentions, states)
-        concat_context = torch.cat((context, query), dim=2)
+        hidden_context = torch.bmm(attentions, states)
         # (B, L_tgt, H)
-        attention_hidden = self._context(concat_context)
+        hidden_context = self._linear_context(torch.cat((hidden_context, query), dim=2))
+        # attention_hidden = self._context2(attention_hidden)
         # (B, L_src, 1)
         attentions = attentions.transpose(1, 2).contiguous()
         new_coverage = coverage + attentions
-        return context, attention_hidden, new_coverage, attentions
+        return hidden_context, new_coverage, attentions
