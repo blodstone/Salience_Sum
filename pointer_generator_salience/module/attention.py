@@ -1,8 +1,8 @@
-from typing import Any, Tuple
+from typing import Tuple
 
 import torch
 from allennlp.common import Registrable
-from torch.nn import Module, Sequential, Linear, Tanh, Softmax, ReLU
+from torch.nn import Module, Linear, Softmax
 
 
 class Attention(Module, Registrable):
@@ -16,11 +16,6 @@ class Attention(Module, Registrable):
         # The query is cat[emb, attn_hidden]
         self._linear_query = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True)
         self._linear_source = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=False)
-        self._linear_context = Sequential(
-            Linear(hidden_size * self.num_directions + hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True),
-            ReLU(),
-            Linear(hidden_size * self.num_directions, hidden_size * self.num_directions),
-        )
         self._linear_coverage = Linear(1, hidden_size * self.num_directions, bias=False)
         self._v = Linear(hidden_size * self.num_directions, 1, bias=False)
         self._softmax = Softmax(dim=2)
@@ -86,9 +81,6 @@ class Attention(Module, Registrable):
         attentions = self._softmax(alignments)
         # (B, L_tgt, L_src) X (B, L_src, 2*H) = (B, L_tgt, 2*H)
         hidden_context = torch.bmm(attentions, states)
-        # (B, L_tgt, H)
-        hidden_context = self._linear_context(torch.cat((hidden_context, query), dim=2))
-        # attention_hidden = self._context2(attention_hidden)
         # (B, L_src, 1)
         attentions = attentions.transpose(1, 2).contiguous()
         new_coverage = coverage + attentions
