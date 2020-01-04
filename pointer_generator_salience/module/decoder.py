@@ -24,18 +24,18 @@ class Decoder(Module, Registrable):
         if attention is None:
             self.is_attention = False
             self.rnn = LSTM(input_size=self.input_size,
-                            hidden_size=self.hidden_size,
+                            hidden_size=2*self.hidden_size,
                             num_layers=self.num_layers,
                             batch_first=True)
         else:
             self.is_attention = True
             self.attention = attention
-            self.rnn = LSTM(input_size=self.hidden_size + self.input_size,
-                            hidden_size=self.hidden_size,
+            self.rnn = LSTM(input_size=2*self.hidden_size + self.input_size,
+                            hidden_size=2*self.hidden_size,
                             num_layers=self.num_layers,
                             batch_first=True)
             self._p_gen = Sequential(
-                Linear(self.hidden_size + self.hidden_size + self.input_size, 1, bias=True),
+                Linear(2*self.hidden_size + 2*self.hidden_size + self.input_size, 1, bias=True),
                 Sigmoid()
             )
         self.gen_vocab_dist = None
@@ -43,9 +43,9 @@ class Decoder(Module, Registrable):
     def add_vocab(self, vocab: Vocabulary):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
-            Linear(self.hidden_size, self.hidden_size, bias=True),
+            Linear(4*self.hidden_size, 4*self.hidden_size, bias=True),
             ReLU(),
-            Linear(self.hidden_size, self.vocab.get_vocab_size())
+            Linear(4*self.hidden_size, self.vocab.get_vocab_size())
         )
 
     def get_output_dim(self) -> int:
@@ -68,22 +68,25 @@ class Decoder(Module, Registrable):
         if len(input_emb.size()) == 2:
             input_emb = input_emb.unsqueeze(1)
         batch_size = input_emb.size(0)
+        hidden_context = None
         attention = None
         if self.is_attention:
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
             hidden_context, coverage, attention = self.attention(
                 dec_state, states, source_mask, coverage)
-            state['class_logits'] = self._build_class_logits(
-                attention, hidden_context, dec_state, input_emb, source_ids, max_oov)
             input_tensor = torch.cat([hidden_context, input_emb], dim=2)
         else:
-            state['class_logits'] = self._build_class_logits_no_attn(dec_state)
             input_tensor = input_emb
         dec_state, final = self.rnn(
             input_tensor,
-            (hidden.view(-1, batch_size, self.hidden_size),
-             context.view(-1, batch_size, self.hidden_size))
+            (hidden.view(-1, batch_size, 2*self.hidden_size),
+             context.view(-1, batch_size, 2*self.hidden_size))
         )
+        if self.is_attention:
+            state['class_logits'] = self._build_class_logits(
+                attention, hidden_context, dec_state, input_emb, source_ids, max_oov)
+        else:
+            state['class_logits'] = self._build_class_logits_no_attn(dec_state)
         state['dec_state'] = dec_state
         state['coverage'] = coverage
         state['attention'] = attention
@@ -100,7 +103,7 @@ class Decoder(Module, Registrable):
                             max_oov: torch.Tensor
                             ) -> torch.Tensor:
         p_gen = self._p_gen(torch.cat((hidden_context, dec_state, input_emb), dim=2))
-        vocab_dist = (p_gen * self.gen_vocab_dist(hidden_context)).squeeze(1)
+        vocab_dist = (p_gen * self.gen_vocab_dist(torch.cat((hidden_context, dec_state), dim=2))).squeeze(1)
         if (max_oov.max()+1).item() > self.vocab.get_vocab_size():
             extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max()+1])
             extended_vocab[:, :vocab_dist.size(1)] = vocab_dist

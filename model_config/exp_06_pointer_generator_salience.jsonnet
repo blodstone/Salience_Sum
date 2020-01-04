@@ -36,7 +36,6 @@ local CUDA=0;
       "hidden_size": HIDDEN,
       "bidirectional": true,
     },
-    "hidden_size": HIDDEN,
     "max_steps": 400,
     "source_embedder": {
       "token_embedders": {

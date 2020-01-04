@@ -29,7 +29,6 @@ class EncoderDecoder(Model):
                  encoder: Encoder,
                  decoder: Decoder,
                  salience_predictor: SaliencePredictor,
-                 hidden_size: int,
                  vocab: Vocabulary,
                  teacher_force_ratio: float,
                  regularizer: RegularizerApplicator = None) -> None:
@@ -38,10 +37,10 @@ class EncoderDecoder(Model):
         self.coverage_lambda = coverage_lambda
         self.salience_lambda = salience_lambda
         self.max_steps = max_steps
-        self.hidden_size = hidden_size
         self.source_embedder = source_embedder
         self.target_embedder = target_embedder
         self.encoder = encoder
+        self.hidden_size = self.encoder.get_output_dim()
         self.salience_predictor = salience_predictor
         self.decoder = decoder
         self.teacher_force_ratio = teacher_force_ratio
@@ -50,7 +49,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=5)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10, per_node_beam_size=5)
         self.criterion = CrossEntropyLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0
@@ -189,7 +188,7 @@ class EncoderDecoder(Model):
         states, final_state = self.encoder(embedded_src, state['source_lengths'])
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
         state['hidden'] = final_state  # (B, L, Num Direction * D_h)
-        assert state['encoder_states'].size(2) == (2 * self.hidden_size)
+        assert state['encoder_states'].size(2) == self.hidden_size
         return state
 
     def _decode(self,

@@ -33,7 +33,7 @@ class Encoder(Seq2SeqEncoder):
                         num_layers=self.num_layers,
                         bidirectional=bidirectional,
                         batch_first=True)
-        self.reduce = Linear(self.hidden_size * self.num_directions, self.hidden_size, bias=False)
+        # self.reduce = Linear(self.hidden_size * self.num_directions, self.hidden_size, bias=False)
 
     def forward(self, embedded_src: torch.Tensor,
                 source_lengths: torch.Tensor) \
@@ -57,10 +57,10 @@ class Encoder(Seq2SeqEncoder):
         assert last_layer_state.size(0) == batch_size, f'{last_layer_state.size(0)}'
         assert last_layer_state.size(1) == self.num_directions * self.hidden_size\
             , f'{last_layer_state.size(1)}'
-        last_layer_state = self.reduce(last_layer_state).unsqueeze(1)
+        last_layer_state = last_layer_state.unsqueeze(1)
         assert last_layer_state.size(0) == batch_size, f'{last_layer_state.size(0)}'
         assert last_layer_state.size(1) == 1, f'{last_layer_state.size(1)}'
-        assert last_layer_state.size(2) == self.hidden_size, f'{last_layer_state.size(2)}'
+        assert last_layer_state.size(2) == self.hidden_size * 2, f'{last_layer_state.size(2)}'
         assert len(last_layer_state.shape) == 3
         return last_layer_state
 
@@ -68,7 +68,7 @@ class Encoder(Seq2SeqEncoder):
         return self.input_size
 
     def get_output_dim(self) -> int:
-        return self.hidden_size
+        return 2 * self.hidden_size
 
     def is_bidirectional(self) -> bool:
         return self.bidirectional

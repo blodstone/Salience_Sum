@@ -14,15 +14,15 @@ class Attention(Module, Registrable):
             self.num_directions = 1
         self.hidden = hidden_size
         # The query is cat[emb, attn_hidden]
-        self._linear_query = Linear(hidden_size, hidden_size, bias=True)
-        self._linear_source = Linear(hidden_size * self.num_directions, hidden_size, bias=False)
+        self._linear_query = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True)
+        self._linear_source = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=False)
         self._linear_context = Sequential(
-            Linear(hidden_size * self.num_directions + hidden_size, hidden_size, bias=True),
+            Linear(hidden_size * self.num_directions + hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True),
             ReLU(),
-            Linear(hidden_size, hidden_size),
+            Linear(hidden_size * self.num_directions, hidden_size * self.num_directions),
         )
-        self._linear_coverage = Linear(1, hidden_size, bias=False)
-        self._v = Linear(hidden_size, 1, bias=False)
+        self._linear_coverage = Linear(1, hidden_size * self.num_directions, bias=False)
+        self._v = Linear(hidden_size * self.num_directions, 1, bias=False)
         self._softmax = Softmax(dim=2)
 
     def score(self, query: torch.Tensor, states: torch.Tensor, coverage: torch.Tensor) -> torch.Tensor:
