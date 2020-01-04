@@ -39,6 +39,8 @@ class EncoderDecoder(Model):
         self.max_steps = max_steps
         self.source_embedder = source_embedder
         self.target_embedder = target_embedder
+        self.target_embedder._modules['token_embedder_tokens'].weight = \
+            self.source_embedder._modules['token_embedder_tokens'].weight
         self.encoder = encoder
         self.hidden_size = self.encoder.get_output_dim()
         self.salience_predictor = salience_predictor

@@ -59,7 +59,7 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 12,
+    "batch_size" : 10,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
