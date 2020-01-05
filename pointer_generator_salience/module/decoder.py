@@ -21,19 +21,15 @@ class Decoder(Module, Registrable):
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.input_size = input_size
+        self.rnn = LSTM(input_size=self.input_size,
+                        hidden_size=2 * self.hidden_size,
+                        num_layers=self.num_layers,
+                        batch_first=True)
         if attention is None:
             self.is_attention = False
-            self.rnn = LSTM(input_size=self.input_size,
-                            hidden_size=2*self.hidden_size,
-                            num_layers=self.num_layers,
-                            batch_first=True)
         else:
             self.is_attention = True
             self.attention = attention
-            self.rnn = LSTM(input_size=2*self.hidden_size + self.input_size,
-                            hidden_size=2*self.hidden_size,
-                            num_layers=self.num_layers,
-                            batch_first=True)
             self._p_gen = Sequential(
                 Linear(2*self.hidden_size + 2*self.hidden_size + self.input_size, 1, bias=True),
                 Sigmoid()
@@ -44,8 +40,7 @@ class Decoder(Module, Registrable):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
             Linear(4*self.hidden_size, 4*self.hidden_size, bias=True),
-            ReLU(),
-            Linear(4*self.hidden_size, self.vocab.get_vocab_size())
+            Linear(4*self.hidden_size, self.vocab.get_vocab_size(), bias=True)
         )
 
     def get_output_dim(self) -> int:
@@ -75,11 +70,8 @@ class Decoder(Module, Registrable):
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
             hidden_context, coverage, attention = self.attention(
                 dec_state, states, states_features, source_mask, coverage)
-            input_tensor = torch.cat([hidden_context, input_emb], dim=2)
-        else:
-            input_tensor = input_emb
         dec_state, final = self.rnn(
-            input_tensor,
+            input_emb,
             (hidden.view(-1, batch_size, 2*self.hidden_size),
              context.view(-1, batch_size, 2*self.hidden_size))
         )

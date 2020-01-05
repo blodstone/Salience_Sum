@@ -21,7 +21,7 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 0.7,
+    "teacher_force_ratio": 0.4,
     "coverage_lambda": 1.0,
     "salience_lambda": 0.0,
     "decoder": {
@@ -37,7 +37,7 @@ local CUDA=0;
       "hidden_size": HIDDEN,
       "bidirectional": true,
     },
-    "max_steps": 400,
+    "max_steps": 100,
     "source_embedder": {
       "token_embedders": {
           "tokens": {
@@ -60,7 +60,7 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 10,
+    "batch_size" : 64,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {

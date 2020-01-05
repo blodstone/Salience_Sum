@@ -9,7 +9,7 @@ from allennlp.modules import TextFieldEmbedder
 from allennlp.nn import RegularizerApplicator, util
 from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_lengths_from_binary_sequence_mask
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Gumbel
 from torch.nn import CrossEntropyLoss, Softmax, MSELoss
 
 from pointer_generator_salience.module.decoder import Decoder
@@ -105,7 +105,8 @@ class EncoderDecoder(Model):
 
         if target_tokens:
             state = self._decode(source_ids, target_tokens, state)
-            output_dict['loss'] = self._compute_loss(target_ids, salience_values, predicted_salience, state)
+            output_dict['loss'] = self._compute_loss(target_tokens, target_ids,
+                                                     salience_values, predicted_salience, state)
 
         if not self.training and not target_tokens:
             output_dict['results'] = self._forward_beam_search(state, source_ids)
@@ -205,6 +206,7 @@ class EncoderDecoder(Model):
         :param enc_state: The last encoder state
         :return: The output of decoder, attentions and last decoding state
         """
+        gumbel = Gumbel(0, 1)
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
@@ -230,11 +232,13 @@ class EncoderDecoder(Model):
                 all_class_logits.append(state['class_logits'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
-                # prob_dist = Categorical(Softmax(dim=-1)(all_class_logits[-1]))
+                class_logit = state['class_logits'].squeeze(1)
+                _, tokens = (class_logit + gumbel.rsample(class_logit.size())).topk(1)
+                # prob_dist = Categorical(Softmax(dim=-1)(class_logit))
                 # tokens = prob_dist.sample()
-                _, tokens = torch.topk(Softmax(dim=-1)(all_class_logits[-1]), 1)
+                # _, tokens = all_class_logits[-1].topk(1)
                 tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
-                emb = self.target_embedder({'tokens': tokens.squeeze(1)})
+                emb = self.target_embedder({'tokens': tokens})
             # print(predicted_tokens)
         state['all_class_logits'] = torch.cat(all_class_logits, dim=1)
         state['all_coverages'] = torch.cat(all_coverages[:-1], dim=2)
@@ -246,6 +250,7 @@ class EncoderDecoder(Model):
 
     def _compute_loss(self,
                       target_tokens: torch.Tensor,
+                      target_ids: torch.Tensor,
                       salience_values: torch.Tensor,
                       predicted_salience: torch.Tensor,
                       state: Dict[str, torch.Tensor]):
@@ -257,7 +262,7 @@ class EncoderDecoder(Model):
         # (B, L, 1)
         loss = self.criterion(
             all_class_logits[:, :-1, :].transpose(1, 2),
-            target_tokens[:, 1:all_class_logits.size(1)])
+            target_ids[:, 1:all_class_logits.size(1)])
         coverage_loss = torch.min(attentions, coverages).sum(1).mean()
         if predicted_salience is not None:
             predicted_salience = source_mask * predicted_salience.squeeze(2)
