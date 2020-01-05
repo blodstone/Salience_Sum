@@ -60,6 +60,7 @@ class Decoder(Module, Registrable):
         source_ids = state['source_ids']
         max_oov = state['max_oov']
         states = state['encoder_states']
+        states_features = state['states_features']
         hidden = state['hidden']
         context = state['context']
         dec_state = state['dec_state']
@@ -73,7 +74,7 @@ class Decoder(Module, Registrable):
         if self.is_attention:
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
             hidden_context, coverage, attention = self.attention(
-                dec_state, states, source_mask, coverage)
+                dec_state, states, states_features, source_mask, coverage)
             input_tensor = torch.cat([hidden_context, input_emb], dim=2)
         else:
             input_tensor = input_emb

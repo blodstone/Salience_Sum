@@ -82,6 +82,7 @@ class EncoderDecoder(Model):
                 source_text: Dict[str, Any],
                 source_ids: Dict[str, torch.Tensor],
                 target_tokens: Dict[str, torch.Tensor] = None,
+                target_ids: torch.Tensor = None,
                 salience_values: torch.Tensor = None) \
             -> Dict[str, torch.Tensor]:
         """
@@ -92,22 +93,22 @@ class EncoderDecoder(Model):
         :param salience_values: The saliency values for source tokens
         :param source_tokens: Indexes of states tokens
         :param target_tokens: Indexes of target tokens
+        :param target_ids: Similar with target_tokens but mapped with extended vocabulary
         :return: The loss and prediction of the model
         """
         state = self._encode(source_tokens)
-        if self.salience_lambda == 0.0:
-            with torch.no_grad():
-                predicted_salience = self._predict_salience(state)
-        else:
+        if self.salience_lambda != 0.0:
             predicted_salience = self._predict_salience(state)
+        else:
+            predicted_salience = None
         output_dict = {}
 
         if target_tokens:
             state = self._decode(source_ids, target_tokens, state)
-            output_dict['loss'] = self._compute_loss(target_tokens, salience_values, predicted_salience, state)
+            output_dict['loss'] = self._compute_loss(target_ids, salience_values, predicted_salience, state)
 
         if not self.training and not target_tokens:
-            output_dict['predictions'] = self._forward_beam_search(state, source_ids)
+            output_dict['results'] = self._forward_beam_search(state, source_ids)
         return output_dict
 
     def _forward_beam_search(self,
@@ -124,7 +125,6 @@ class EncoderDecoder(Model):
         # shape (log_probabilities): (batch_size, beam_size)
         all_top_k_predictions, log_probabilities = self.beam.search(
             start_predictions, state, self.take_step)
-
         output_dict = {
             "class_log_probabilities": log_probabilities,
             "predictions": all_top_k_predictions,
@@ -171,9 +171,9 @@ class EncoderDecoder(Model):
         state = self.decoder(emb, state)
         return Softmax(dim=-1)(state['class_logits'].squeeze(1)).log(), state
 
-    def _predict_salience(self, state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        state = self.salience_predictor(state)
-        return state
+    def _predict_salience(self, state: Dict[str, torch.Tensor]) -> torch.Tensor:
+        predicted_salience = self.salience_predictor(state)
+        return predicted_salience
 
     def _encode(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """
@@ -187,9 +187,10 @@ class EncoderDecoder(Model):
         embedded_src = self.source_embedder(source_tokens)
 
         # final_state = (last state, last context)
-        states, final_state = self.encoder(embedded_src, state['source_lengths'])
+        states_features, states, final_state = self.encoder(embedded_src, state['source_lengths'])
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
         state['hidden'] = final_state  # (B, L, Num Direction * D_h)
+        state['states_features'] = states_features # (B, L, Num Direction * D_h)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state
 
@@ -224,7 +225,7 @@ class EncoderDecoder(Model):
             tokens = state["encoder_states"].new_full(
                 (state["encoder_states"].size(0),), fill_value=self.start_idx, dtype=torch.long)
             emb = self.target_embedder({'tokens': tokens})
-            for step in range(self.max_steps):
+            for step in range(target_tokens['tokens'].size(1)):
                 state = self.decoder(emb, state)
                 all_class_logits.append(state['class_logits'])
                 all_coverages.append(state['coverage'])
@@ -244,29 +245,26 @@ class EncoderDecoder(Model):
         return state
 
     def _compute_loss(self,
-                      target_tokens: Dict[str, torch.Tensor],
+                      target_tokens: torch.Tensor,
                       salience_values: torch.Tensor,
                       predicted_salience: torch.Tensor,
                       state: Dict[str, torch.Tensor]):
         # (B, L, V)
-        all_class_logits = state['all_class_logits'].transpose(1, 2).contiguous()
+        all_class_logits = state['all_class_logits']
         attentions = state['all_attentions']
         coverages = state['all_coverages']
         source_mask = state['source_mask']
-        predicted_salience = source_mask * predicted_salience.squeeze(2)
-        salience_values = source_mask * salience_values
-        tokens = target_tokens['tokens'][:, 1:]
-        batch_size = tokens.size(0)
-        dim = all_class_logits.size(2) - 1
-        pad_tokens = all_class_logits.new_full(
-            (all_class_logits.size(0), dim),
-            fill_value=self.padding_idx, dtype=torch.long)
-        pad_tokens[:, :tokens.size(1)] = tokens
-
         # (B, L, 1)
-        loss = self.criterion(all_class_logits[:, :, :-1], pad_tokens)
+        loss = self.criterion(
+            all_class_logits[:, :-1, :].transpose(1, 2),
+            target_tokens[:, 1:all_class_logits.size(1)])
         coverage_loss = torch.min(attentions, coverages).sum(1).mean()
-        salience_loss = self.prediction_criterion(predicted_salience, salience_values)
+        if predicted_salience is not None:
+            predicted_salience = source_mask * predicted_salience.squeeze(2)
+            salience_values = source_mask * salience_values
+            salience_loss = self.prediction_criterion(predicted_salience, salience_values)
+        else:
+            salience_loss = torch.zeros(1)
         total_loss = loss + self.coverage_lambda * coverage_loss + \
                      self.salience_lambda * salience_loss
         self.salience_MSE = salience_loss.item()

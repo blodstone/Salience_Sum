@@ -8,7 +8,8 @@ local CUDA=0;
     "interpolation": false,
     "predict": false,
     "use_salience": true,
-    "source_max_tokens": 400
+    "source_max_tokens": 400,
+    "target_max_tokens": 100,
   },
   "train_data_path": "data/bbc_allen/train.tsv.tagged",
   "validation_data_path": "data/bbc_allen/validation.tsv.tagged",

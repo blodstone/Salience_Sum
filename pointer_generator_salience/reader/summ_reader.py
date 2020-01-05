@@ -8,6 +8,7 @@ from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from scipy.interpolate import CubicSpline
 
 from pointer_generator_salience.reader.copy_field import CopyField
+from pointer_generator_salience.reader.target_copy_field import TargetCopyField
 
 
 @DatasetReader.register("summdatareader_salience")
@@ -71,6 +72,7 @@ class SummDataReader(DatasetReader):
         source_field = TextField(tokenized_src, {'tokens': indexer})
         source_text_field = MetadataField(metadata=tokenized_src)
         source_ids_field = CopyField(tokenized_src)
+
             # ArrayField(np.array(self.text_to_ids(tokenized_src)))
         output_field = {
             'source_tokens': source_field,
@@ -83,7 +85,11 @@ class SummDataReader(DatasetReader):
                             [Token(END_SYMBOL)]
             # Source and target are sharing vocabulary
             target_field = TextField(tokenized_tgt, {'tokens': indexer})
+            target_ids_field = TargetCopyField(tokenized_src,
+                                               tokenized_tgt,
+                                               self._target_max_tokens)
             output_field['target_tokens'] = target_field
+            output_field['target_ids'] = target_ids_field
         if salience_seq:
             if self._interpolation:
                 salience_field = ArrayField(

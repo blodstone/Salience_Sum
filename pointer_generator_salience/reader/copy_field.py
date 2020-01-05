@@ -13,16 +13,22 @@ class CopyField(Field[torch.Tensor]):
         self._source_tokens = source_tokens
         self._out: List[int] = []
 
-    def index(self, vocab: Vocabulary):
+    @staticmethod
+    def generate_ids_out(vocab: Vocabulary, source_tokens: List[Token]):
         vocab_size = vocab.get_vocab_size()
         ids = {}
-        for token in self._source_tokens:
+        out = []
+        for token in source_tokens:
             text = token.text.lower()
             text_ids = vocab.get_token_index(text)
             if text_ids == vocab.get_token_index(DEFAULT_OOV_TOKEN):
-                self._out.append(ids.setdefault(text, len(ids) + vocab_size))
+                out.append(ids.setdefault(text, len(ids) + vocab_size))
             else:
-                self._out.append(text_ids)
+                out.append(text_ids)
+        return ids, out
+
+    def index(self, vocab: Vocabulary):
+        _, self._out = self.generate_ids_out(vocab, self._source_tokens)
 
     def get_padding_lengths(self) -> Dict[str, int]:
         return {"num_tokens": len(self._source_tokens)}

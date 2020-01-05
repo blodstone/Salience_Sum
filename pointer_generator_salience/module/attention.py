@@ -15,12 +15,14 @@ class Attention(Module, Registrable):
         self.hidden = hidden_size
         # The query is cat[emb, attn_hidden]
         self._linear_query = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True)
-        self._linear_source = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=False)
         self._linear_coverage = Linear(1, hidden_size * self.num_directions, bias=False)
         self._v = Linear(hidden_size * self.num_directions, 1, bias=False)
         self._softmax = Softmax(dim=2)
 
-    def score(self, query: torch.Tensor, states: torch.Tensor, coverage: torch.Tensor) -> torch.Tensor:
+    def score(self, query: torch.Tensor,
+              states: torch.Tensor,
+              states_features: torch.Tensor,
+              coverage: torch.Tensor) -> torch.Tensor:
         """
         Bahdanau attention
         :param coverage: The coverage of all the previous steps (dim: H)
@@ -40,8 +42,6 @@ class Attention(Module, Registrable):
         # (B x L_tgt x 1 x 2H) -> (B x L_tgt x L_src x 2H)
         query_features = query_features.expand(batch_size, tgt_length, src_length, dim)
 
-        # (B x L_src x 2H) -> (B x L_src x 2H)
-        states_features = self._linear_source(states)
         # (B x L_src x 2H) -> (B x 1 x L_src x 2H)
         states_features = states_features.unsqueeze(1)
         # (B x 1 x L_src x 2H) -> (B x L_tgt x L_src x 2H)
@@ -62,12 +62,14 @@ class Attention(Module, Registrable):
     def forward(self,
                 query: torch.Tensor,
                 states: torch.Tensor,
+                states_features: torch.Tensor,
                 source_mask: torch.Tensor,
                 coverage: torch.Tensor) \
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculating the attention using Bahdanau approach
 
+        :param states_features: Precalculated states features
         :param coverage: The previous coverage (B, L_src, 1)
         :param source_mask: Mask for source (B, L_src, 1)
         :param query: The state of target (B, L_tgt, H)
@@ -75,7 +77,7 @@ class Attention(Module, Registrable):
         :return: The weighted context (B, 1, H)
         """
         # (B, L_tgt, L_src)
-        alignments = self.score(query, states, coverage)
+        alignments = self.score(query, states, states_features, coverage)
         # Set padding to zero
         alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(1), float('-inf'))
         attentions = self._softmax(alignments)
