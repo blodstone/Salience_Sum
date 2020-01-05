@@ -206,10 +206,12 @@ class EncoderDecoder(Model):
         :param enc_state: The last encoder state
         :return: The output of decoder, attentions and last decoding state
         """
-        gumbel = Gumbel(0, 1)
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
+        loc = state['source_mask'].new_zeros((1,), dtype=torch.float)
+        scale = state['source_mask'].new_ones((1,), dtype=torch.float)
+        gumbel = Gumbel(loc, scale)
         all_class_logits = []
         batch_size, length = state['source_mask'].size()
         all_coverages = [state['source_mask'].new_zeros(
