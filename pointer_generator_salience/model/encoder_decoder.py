@@ -190,7 +190,7 @@ class EncoderDecoder(Model):
         states_features, states, final_state = self.encoder(embedded_src, state['source_lengths'])
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
         state['hidden'] = final_state  # (B, L, Num Direction * D_h)
-        state['states_features'] = states_features # (B, L, Num Direction * D_h)
+        state['states_features'] = states_features  # (B, L, Num Direction * D_h)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state
 
@@ -263,11 +263,11 @@ class EncoderDecoder(Model):
             predicted_salience = source_mask * predicted_salience.squeeze(2)
             salience_values = source_mask * salience_values
             salience_loss = self.prediction_criterion(predicted_salience, salience_values)
+            total_loss = loss + self.coverage_lambda * coverage_loss + \
+                         self.salience_lambda * salience_loss
+            self.salience_MSE = salience_loss.item()
         else:
-            salience_loss = torch.zeros(1)
-        total_loss = loss + self.coverage_lambda * coverage_loss + \
-                     self.salience_lambda * salience_loss
-        self.salience_MSE = salience_loss.item()
+            total_loss = loss + self.coverage_lambda * coverage_loss
         self.coverage_loss = coverage_loss.item()
         return total_loss
 
