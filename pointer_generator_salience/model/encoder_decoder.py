@@ -265,17 +265,22 @@ class EncoderDecoder(Model):
         # (B, L, 1)
         length = all_class_log_probs.size(1)
         step_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
+        # coverage_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
         for i in range(length):
             target = target_ids[:, i]
-            gold_probs = torch.gather(all_class_log_probs[:, i], 1, target.unsqueeze(1)).squeeze()
+            gold_probs = torch.gather(all_class_log_probs[:, i, :], 1, target.unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs)
-            step_coverage_loss = torch.sum(torch.min(attentions[:, i], coverages[:, i]), 1)
-            step_loss = step_loss + self.coverage_lambda * step_coverage_loss
-            step_loss = step_loss * target_mask[:, i]
+            # step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
+            # step_loss = step_loss + self.coverage_lambda * step_coverage_loss
+            # step_loss = step_loss * target_mask[:, i]
+            # step_coverage_loss = step_coverage_loss * target_mask[:, i]
             step_losses += step_loss
+            # coverage_losses += step_coverage_loss
 
+        # batch_coverage_loss = coverage_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
         batch_avg_loss = step_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
         total_loss = torch.mean(batch_avg_loss)
+        # total_coverage_loss = torch.mean(batch_coverage_loss)
         # loss = self.criterion(
         #     all_class_log_probs[:, :-1, :].transpose(1, 2),
         #     target_ids[:, 1:all_class_log_probs.size(1)])
@@ -286,7 +291,7 @@ class EncoderDecoder(Model):
             salience_loss = self.prediction_criterion(predicted_salience, salience_values)
             total_loss = total_loss + self.salience_lambda * salience_loss
             self.salience_MSE = salience_loss.item()
-        # self.coverage_loss = coverage_loss.item()
+        # self.coverage_loss = total_coverage_loss.item()
         return total_loss
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:

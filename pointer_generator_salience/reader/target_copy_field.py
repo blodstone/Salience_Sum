@@ -29,7 +29,7 @@ class TargetCopyField(Field[torch.Tensor]):
                 self._out.append(vocab.get_token_index(text))
 
     def get_padding_lengths(self) -> Dict[str, int]:
-        return {"num_tokens": self._max_tokens}
+        return {"num_tokens": len(self._target_tokens)}
 
     def as_tensor(self, padding_lengths: Dict[str, int]) -> DataArray:
         desired_length = padding_lengths["num_tokens"]
