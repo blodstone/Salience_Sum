@@ -61,24 +61,25 @@ class Decoder(Module, Registrable):
         states_features = state['states_features']
         hidden = state['hidden']
         context = state['context']
-        dec_state = state['dec_state']
+        prev_dec_state = state['dec_state']
         source_mask = state['source_mask']
         coverage = state['coverage']
         if len(input_emb.size()) == 2:
             input_emb = input_emb.unsqueeze(1)
         batch_size = input_emb.size(0)
-        hidden_context = None
+        hidden_context = state['hidden_context']
         attention = None
-        if self.is_attention:
-            # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
-            hidden_context, coverage, attention = self.attention(
-                dec_state, states, states_features, source_mask, coverage)
+
         dec_state, final = self.rnn(
             self.input_context(
                 torch.cat((hidden_context, input_emb), dim=2)),
             (hidden.view(-1, batch_size, 2*self.hidden_size),
              context.view(-1, batch_size, 2*self.hidden_size))
         )
+        if self.is_attention:
+            # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
+            hidden_context, coverage, attention = self.attention(
+                prev_dec_state, states, states_features, source_mask, coverage)
         if self.is_attention:
             state['class_probs'] = self._build_class_logits(
                 attention, hidden_context, dec_state, input_emb, source_ids, max_oov)

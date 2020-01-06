@@ -75,6 +75,7 @@ class EncoderDecoder(Model):
         state['context'] = states.new_zeros((batch_size, 1, self.hidden_size))
         state['dec_state'] = state['hidden']
         state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
+        state['hidden_context'] = state['hidden'].new_zeros(state['hidden'].size())
         return state
 
     def forward(self,
@@ -209,9 +210,7 @@ class EncoderDecoder(Model):
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
-        loc = state['source_mask'].new_zeros((1,), dtype=torch.float)
-        scale = state['source_mask'].new_ones((1,), dtype=torch.float)
-        # gumbel = Gumbel(loc, scale)
+
         all_class_probs = []
         batch_size, length = state['source_mask'].size()
         all_coverages = [state['source_mask'].new_zeros(
@@ -237,9 +236,9 @@ class EncoderDecoder(Model):
                 class_prob = all_class_probs[-1].squeeze(1)
                 # gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
                 # _, tokens = (class_logit + gumbel_sample).topk(1)
-                # prob_dist = Categorical(class_prob)
-                # tokens = prob_dist.sample()
-                _, tokens = class_prob.topk(1)
+                prob_dist = Categorical(class_prob)
+                tokens = prob_dist.sample()
+                # _, tokens = class_prob.topk(1)
                 tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
                 emb = self.target_embedder({'tokens': tokens})
             # print(predicted_tokens)

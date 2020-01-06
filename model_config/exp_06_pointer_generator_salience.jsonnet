@@ -21,7 +21,7 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 0.4,
+    "teacher_force_ratio": 0.6,
     "coverage_lambda": 1.0,
     "salience_lambda": 0.0,
     "decoder": {
