@@ -270,8 +270,8 @@ class EncoderDecoder(Model):
             target = target_ids[:, i]
             gold_probs = torch.gather(all_class_log_probs[:, i, :], 1, target.unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs)
-            # step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
-            # step_loss = step_loss + self.coverage_lambda * step_coverage_loss
+            step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
+            step_loss = step_loss + self.coverage_lambda * step_coverage_loss
             # step_loss = step_loss * target_mask[:, i]
             # step_coverage_loss = step_coverage_loss * target_mask[:, i]
             step_losses += step_loss
