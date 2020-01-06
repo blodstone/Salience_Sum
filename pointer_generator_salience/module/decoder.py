@@ -39,8 +39,8 @@ class Decoder(Module, Registrable):
     def add_vocab(self, vocab: Vocabulary):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
-            Linear(4*self.hidden_size, 4*self.hidden_size, bias=True),
-            Linear(4*self.hidden_size, self.vocab.get_vocab_size(), bias=True)
+            Linear(4*self.hidden_size, 2*self.hidden_size, bias=True),
+            Linear(2*self.hidden_size, self.vocab.get_vocab_size(), bias=True)
         )
 
     def get_output_dim(self) -> int:
