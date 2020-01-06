@@ -108,7 +108,7 @@ class Decoder(Module, Registrable):
             extended_vocab = vocab_dist
         attn_dist = ((1 - p_gen) * attention).squeeze(2)
         final_dist = extended_vocab.scatter_add(1, source_ids, attn_dist).unsqueeze(1)
-        return final_dist
+        return final_dist + 1e-13
 
     def _build_class_logits_no_attn(self,
                                     dec_state: torch.Tensor,
