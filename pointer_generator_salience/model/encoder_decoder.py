@@ -51,7 +51,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10, per_node_beam_size=5)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
         self.criterion = CrossEntropyLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0

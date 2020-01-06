@@ -25,6 +25,8 @@ class Decoder(Module, Registrable):
                         hidden_size=2 * self.hidden_size,
                         num_layers=self.num_layers,
                         batch_first=True)
+        self.input_context = Linear(
+            2*hidden_size + input_size, input_size)
         if attention is None:
             self.is_attention = False
         else:
@@ -71,7 +73,8 @@ class Decoder(Module, Registrable):
             hidden_context, coverage, attention = self.attention(
                 dec_state, states, states_features, source_mask, coverage)
         dec_state, final = self.rnn(
-            input_emb,
+            self.input_context(
+                torch.cat((hidden_context, input_emb), dim=2)),
             (hidden.view(-1, batch_size, 2*self.hidden_size),
              context.view(-1, batch_size, 2*self.hidden_size))
         )
