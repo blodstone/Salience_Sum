@@ -10,7 +10,7 @@ from allennlp.nn import RegularizerApplicator, util
 from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_lengths_from_binary_sequence_mask
 from torch.distributions import Categorical, Gumbel
-from torch.nn import CrossEntropyLoss, Softmax, MSELoss
+from torch.nn import CrossEntropyLoss, Softmax, MSELoss, NLLLoss
 
 from pointer_generator_salience.module.decoder import Decoder
 from pointer_generator_salience.module.encoder import Encoder
@@ -52,7 +52,7 @@ class EncoderDecoder(Model):
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
         self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
-        self.criterion = CrossEntropyLoss(ignore_index=self.padding_idx)
+        self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0
         self.coverage_loss = 0.0
@@ -212,7 +212,7 @@ class EncoderDecoder(Model):
         loc = state['source_mask'].new_zeros((1,), dtype=torch.float)
         scale = state['source_mask'].new_ones((1,), dtype=torch.float)
         gumbel = Gumbel(loc, scale)
-        all_class_logits = []
+        all_class_probs = []
         batch_size, length = state['source_mask'].size()
         all_coverages = [state['source_mask'].new_zeros(
             (batch_size, length, 1), dtype=torch.float)]
@@ -222,7 +222,7 @@ class EncoderDecoder(Model):
             embedded_tgt = self.target_embedder(target_tokens)
             for step, emb in enumerate(embedded_tgt.split(1, dim=1)):
                 state = self.decoder(emb, state)
-                all_class_logits.append(state['class_logits'])
+                all_class_probs.append(state['class_probs'].exp())
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
         else:
@@ -231,19 +231,19 @@ class EncoderDecoder(Model):
             emb = self.target_embedder({'tokens': tokens})
             for step in range(target_tokens['tokens'].size(1)):
                 state = self.decoder(emb, state)
-                all_class_logits.append(state['class_logits'])
+                all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
-                class_logit = state['class_logits'].squeeze(1)
-                gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
-                _, tokens = (class_logit + gumbel_sample).topk(1)
-                # prob_dist = Categorical(Softmax(dim=-1)(class_logit))
-                # tokens = prob_dist.sample()
-                # _, tokens = all_class_logits[-1].topk(1)
+                class_prob = all_class_probs[-1].squeeze(1)
+                # gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
+                # _, tokens = (class_logit + gumbel_sample).topk(1)
+                prob_dist = Categorical(class_prob)
+                tokens = prob_dist.sample()
+                # _, tokens = all_class_probs[-1].topk(1)
                 tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
                 emb = self.target_embedder({'tokens': tokens})
             # print(predicted_tokens)
-        state['all_class_logits'] = torch.cat(all_class_logits, dim=1)
+        state['all_class_probs'] = torch.cat(all_class_probs, dim=1)
         state['all_coverages'] = torch.cat(all_coverages[:-1], dim=2)
         state['all_attentions'] = torch.cat(all_attentions, dim=2)
         state.pop('class_logits', None)
@@ -258,14 +258,14 @@ class EncoderDecoder(Model):
                       predicted_salience: torch.Tensor,
                       state: Dict[str, torch.Tensor]):
         # (B, L, V)
-        all_class_logits = state['all_class_logits']
+        all_class_log_probs = state['all_class_probs'].log()
         attentions = state['all_attentions']
         coverages = state['all_coverages']
         source_mask = state['source_mask']
         # (B, L, 1)
         loss = self.criterion(
-            all_class_logits[:, :-1, :].transpose(1, 2),
-            target_ids[:, 1:all_class_logits.size(1)])
+            all_class_log_probs[:, :-1, :].transpose(1, 2),
+            target_ids[:, 1:all_class_log_probs.size(1)])
         coverage_loss = torch.min(attentions, coverages).sum(1).mean()
         if predicted_salience is not None:
             predicted_salience = source_mask * predicted_salience.squeeze(2)

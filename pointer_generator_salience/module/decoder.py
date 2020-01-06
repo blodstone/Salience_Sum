@@ -42,7 +42,8 @@ class Decoder(Module, Registrable):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
             Linear(4*self.hidden_size, 2*self.hidden_size, bias=True),
-            Linear(2*self.hidden_size, self.vocab.get_vocab_size(), bias=True)
+            Linear(2*self.hidden_size, self.vocab.get_vocab_size(), bias=True),
+            Softmax(dim=-1)
         )
 
     def get_output_dim(self) -> int:
@@ -79,10 +80,10 @@ class Decoder(Module, Registrable):
              context.view(-1, batch_size, 2*self.hidden_size))
         )
         if self.is_attention:
-            state['class_logits'] = self._build_class_logits(
+            state['class_probs'] = self._build_class_logits(
                 attention, hidden_context, dec_state, input_emb, source_ids, max_oov)
         else:
-            state['class_logits'] = self._build_class_logits_no_attn(dec_state)
+            state['class_probs'] = self._build_class_logits_no_attn(dec_state)
         state['dec_state'] = dec_state
         state['coverage'] = coverage
         state['attention'] = attention
@@ -107,13 +108,10 @@ class Decoder(Module, Registrable):
             extended_vocab = vocab_dist
         attn_dist = ((1 - p_gen) * attention).squeeze(2)
         final_dist = extended_vocab.scatter_add(1, source_ids, attn_dist).unsqueeze(1)
-        # some logits might zero
-
-        class_logits = final_dist + 1e-13
-        return class_logits
+        return final_dist
 
     def _build_class_logits_no_attn(self,
                                     dec_state: torch.Tensor,
                                     ) -> torch.Tensor:
-        class_logits = self.gen_vocab_dist(dec_state).squeeze(1)
-        return class_logits
+        final_dist = self.gen_vocab_dist(dec_state).squeeze(1)
+        return final_dist
