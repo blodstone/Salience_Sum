@@ -170,7 +170,7 @@ class EncoderDecoder(Model):
             'tokens': last_predictions
         })
         state = self.decoder(emb, state)
-        return Softmax(dim=-1)(state['class_logits'].squeeze(1)).log(), state
+        return state['class_probs'].squeeze(1).log(), state
 
     def _predict_salience(self, state: Dict[str, torch.Tensor]) -> torch.Tensor:
         predicted_salience = self.salience_predictor(state)
@@ -211,7 +211,7 @@ class EncoderDecoder(Model):
         state['max_oov'] = source_ids['max_oov']
         loc = state['source_mask'].new_zeros((1,), dtype=torch.float)
         scale = state['source_mask'].new_ones((1,), dtype=torch.float)
-        gumbel = Gumbel(loc, scale)
+        # gumbel = Gumbel(loc, scale)
         all_class_probs = []
         batch_size, length = state['source_mask'].size()
         all_coverages = [state['source_mask'].new_zeros(
@@ -222,7 +222,7 @@ class EncoderDecoder(Model):
             embedded_tgt = self.target_embedder(target_tokens)
             for step, emb in enumerate(embedded_tgt.split(1, dim=1)):
                 state = self.decoder(emb, state)
-                all_class_probs.append(state['class_probs'].exp())
+                all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
         else:
@@ -237,16 +237,16 @@ class EncoderDecoder(Model):
                 class_prob = all_class_probs[-1].squeeze(1)
                 # gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
                 # _, tokens = (class_logit + gumbel_sample).topk(1)
-                prob_dist = Categorical(class_prob)
-                tokens = prob_dist.sample()
-                # _, tokens = all_class_probs[-1].topk(1)
+                # prob_dist = Categorical(class_prob)
+                # tokens = prob_dist.sample()
+                _, tokens = class_prob.topk(1)
                 tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
                 emb = self.target_embedder({'tokens': tokens})
             # print(predicted_tokens)
         state['all_class_probs'] = torch.cat(all_class_probs, dim=1)
         state['all_coverages'] = torch.cat(all_coverages[:-1], dim=2)
         state['all_attentions'] = torch.cat(all_attentions, dim=2)
-        state.pop('class_logits', None)
+        state.pop('class_probs', None)
         state.pop('coverage', None)
         state.pop('attention', None)
         return state
