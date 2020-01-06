@@ -257,27 +257,36 @@ class EncoderDecoder(Model):
                       predicted_salience: torch.Tensor,
                       state: Dict[str, torch.Tensor]):
         # (B, L, V)
-        all_class_log_probs = state['all_class_probs']
+        all_class_probs = state['all_class_probs']
         attentions = state['all_attentions']
         coverages = state['all_coverages']
         source_mask = state['source_mask']
         target_mask = util.get_text_field_mask(target_tokens)
         assert target_mask.size(1) == target_ids.size(1)
         # (B, L, 1)
-        length = all_class_log_probs.size(1)
-        step_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
-        coverage_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
+        length = all_class_probs.size(1)
+        step_losses = all_class_probs.new_zeros((all_class_probs.size(0),))
+        target_mask_t = target_mask.transpose(0, 1).contiguous()
+        coverage_losses = all_class_probs.new_zeros((all_class_probs.size(0),))
+        # batch_size, length, class_size,  = all_class_probs.size()
+        # gold_probs = torch.gather(
+        #     all_class_probs.view(batch_size, class_size, length), 1,
+        #     target_ids.unsqueeze(1).view(batch_size, 1, length))
+        # nll_loss = -torch.log(gold_probs)
+        # cov_loss = torch.min(attentions, coverages).sum(1).unsqueeze(1)
+        # loss = nll_loss + self.coverage_lambda * cov_loss
+        # loss = target_mask.unsqueeze(1) * loss
         for i in range(length):
             target = target_ids[:, i]
-            gold_probs = torch.gather(all_class_log_probs[:, i, :], 1, target.unsqueeze(1)).squeeze()
+            gold_probs = torch.gather(all_class_probs[:, i, :], 1, target.unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs)
 
             step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
             step_loss = step_loss + self.coverage_lambda * step_coverage_loss
-            step_loss = step_loss * target_mask[:, i].contiguous()
+            step_loss = step_loss * target_mask_t[i]
 
             # For metric display
-            step_coverage_loss = step_coverage_loss * target_mask[:, i].contiguous()
+            step_coverage_loss = step_coverage_loss * target_mask_t[i]
 
             step_losses += step_loss
             coverage_losses += step_coverage_loss
