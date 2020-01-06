@@ -51,7 +51,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10, per_node_beam_size=5)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0
@@ -251,31 +251,44 @@ class EncoderDecoder(Model):
         return state
 
     def _compute_loss(self,
-                      target_tokens: torch.Tensor,
+                      target_tokens: Dict[str, torch.Tensor],
                       target_ids: torch.Tensor,
                       salience_values: torch.Tensor,
                       predicted_salience: torch.Tensor,
                       state: Dict[str, torch.Tensor]):
         # (B, L, V)
-        all_class_log_probs = state['all_class_probs'].log()
+        all_class_log_probs = state['all_class_probs']
+        target_mask = target_tokens
         attentions = state['all_attentions']
         coverages = state['all_coverages']
         source_mask = state['source_mask']
+        target_mask = util.get_text_field_mask(target_tokens)
         # (B, L, 1)
-        loss = self.criterion(
-            all_class_log_probs[:, :-1, :].transpose(1, 2),
-            target_ids[:, 1:all_class_log_probs.size(1)])
-        coverage_loss = torch.min(attentions, coverages).sum(1).mean()
+        length = all_class_log_probs.size(1)
+        step_losses = []
+        for i in range(length):
+            target = target_ids[:, i]
+            gold_probs = torch.gather(all_class_log_probs[:, i], 1, target.unsqueeze(1)).squeeze()
+            step_loss = -torch.log(gold_probs)
+            step_coverage_loss = torch.sum(torch.min(attentions[:, i], coverages[:, i]), 1)
+            step_loss = step_loss + self.coverage_lambda * step_coverage_loss
+            step_loss = step_loss * target_mask[:,i]
+            step_losses.append(step_loss)
+
+        sum_losses = torch.sum(torch.stack(step_losses, 1), 1)
+        batch_avg_loss = sum_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
+        total_loss = torch.mean(batch_avg_loss)
+        # loss = self.criterion(
+        #     all_class_log_probs[:, :-1, :].transpose(1, 2),
+        #     target_ids[:, 1:all_class_log_probs.size(1)])
+        # coverage_loss = torch.min(attentions, coverages).sum(1).mean()
         if predicted_salience is not None:
             predicted_salience = source_mask * predicted_salience.squeeze(2)
             salience_values = source_mask * salience_values
             salience_loss = self.prediction_criterion(predicted_salience, salience_values)
-            total_loss = loss + self.coverage_lambda * coverage_loss + \
-                         self.salience_lambda * salience_loss
+            total_loss = total_loss + self.salience_lambda * salience_loss
             self.salience_MSE = salience_loss.item()
-        else:
-            total_loss = loss + self.coverage_lambda * coverage_loss
-        self.coverage_loss = coverage_loss.item()
+        # self.coverage_loss = coverage_loss.item()
         return total_loss
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
