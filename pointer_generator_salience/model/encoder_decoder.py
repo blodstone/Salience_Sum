@@ -262,6 +262,7 @@ class EncoderDecoder(Model):
         coverages = state['all_coverages']
         source_mask = state['source_mask']
         target_mask = util.get_text_field_mask(target_tokens)
+        assert target_mask.size(1) == target_ids.size(1)
         # (B, L, 1)
         length = all_class_log_probs.size(1)
         step_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
@@ -272,7 +273,7 @@ class EncoderDecoder(Model):
             step_loss = -torch.log(gold_probs)
             step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
             step_loss = step_loss + self.coverage_lambda * step_coverage_loss
-            # step_loss = step_loss * target_mask[:, i]
+            step_loss = step_loss * target_mask[:, i]
             # step_coverage_loss = step_coverage_loss * target_mask[:, i]
             step_losses += step_loss
             # coverage_losses += step_coverage_loss
