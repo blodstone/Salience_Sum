@@ -264,7 +264,7 @@ class EncoderDecoder(Model):
         target_mask = util.get_text_field_mask(target_tokens)
         # (B, L, 1)
         length = all_class_log_probs.size(1)
-        step_losses = []
+        step_losses = all_class_log_probs.new_zeros((all_class_log_probs.size(0),))
         for i in range(length):
             target = target_ids[:, i]
             gold_probs = torch.gather(all_class_log_probs[:, i], 1, target.unsqueeze(1)).squeeze()
@@ -272,10 +272,9 @@ class EncoderDecoder(Model):
             step_coverage_loss = torch.sum(torch.min(attentions[:, i], coverages[:, i]), 1)
             step_loss = step_loss + self.coverage_lambda * step_coverage_loss
             step_loss = step_loss * target_mask[:, i]
-            step_losses.append(step_loss.unsqueeze(1))
+            step_losses += step_loss
 
-        sum_losses = torch.cat(step_losses, dim=1).sum(1)
-        batch_avg_loss = sum_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
+        batch_avg_loss = step_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
         total_loss = torch.mean(batch_avg_loss)
         # loss = self.criterion(
         #     all_class_log_probs[:, :-1, :].transpose(1, 2),
