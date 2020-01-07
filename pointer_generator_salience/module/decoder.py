@@ -90,6 +90,7 @@ class Decoder(Module, Registrable):
         state['attention'] = attention
         state['hidden'] = final[0].view(batch_size, -1, self.hidden_size)
         state['context'] = final[1].view(batch_size, -1, self.hidden_size)
+        state['hidden_context'] = hidden_context
         return state
 
     def _build_class_logits(self,
