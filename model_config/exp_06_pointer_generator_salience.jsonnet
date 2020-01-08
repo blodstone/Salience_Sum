@@ -21,8 +21,8 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 0.6,
-    "coverage_lambda": 1.0,
+    "teacher_force_ratio": 0.8,
+    "coverage_lambda": 0.0,
     "salience_lambda": 0.0,
     "decoder": {
       "attention": {
@@ -60,14 +60,14 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 52,
+    "batch_size" : 16,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
     "summary_interval": 500,
     "histogram_interval": 1000,
     "num_epochs": 50,
-    "patience": 3,
+    "patience": 4,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
     "grad_norm": 2,

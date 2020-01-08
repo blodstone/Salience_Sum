@@ -237,9 +237,9 @@ class EncoderDecoder(Model):
                 class_prob = all_class_probs[-1].squeeze(1)
                 # gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
                 # _, tokens = (class_logit + gumbel_sample).topk(1)
-                prob_dist = Categorical(class_prob)
-                tokens = prob_dist.sample()
-                # _, tokens = class_prob.topk(1)
+                # prob_dist = Categorical(class_prob)
+                # tokens = prob_dist.sample()
+                _, tokens = class_prob.topk(1)
                 tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
                 emb = self.target_embedder({'tokens': tokens})
             # print(predicted_tokens)
