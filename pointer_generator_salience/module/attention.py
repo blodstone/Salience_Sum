@@ -6,8 +6,9 @@ from torch.nn import Module, Linear, Softmax
 
 
 class Attention(Module, Registrable):
-    def __init__(self, hidden_size: int, bidirectional: bool) -> None:
+    def __init__(self, hidden_size: int, is_coverage: bool, bidirectional: bool) -> None:
         super().__init__()
+        self.is_coverage = is_coverage
         if bidirectional:
             self.num_directions = 2
         else:
@@ -17,7 +18,7 @@ class Attention(Module, Registrable):
         self._linear_query = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=True)
         self._linear_coverage = Linear(1, hidden_size * self.num_directions, bias=False)
         self._v = Linear(hidden_size * self.num_directions, 1, bias=False)
-        self._softmax = Softmax(dim=2)
+        self._softmax = Softmax(dim=1)
 
     def score(self, query: torch.Tensor,
               states: torch.Tensor,
@@ -25,6 +26,7 @@ class Attention(Module, Registrable):
               coverage: torch.Tensor) -> torch.Tensor:
         """
         Bahdanau attention
+        :param states_features:
         :param coverage: The coverage of all the previous steps (dim: H)
         :param query: The decoder states (dim: H)
         :param states: The encoder states (dim: 2H)
@@ -35,28 +37,32 @@ class Attention(Module, Registrable):
         src_length = states.size(1)
         dim = query.size(2)
         # The formula: v.tanh(Wh*hi + Ws*st + b)
-        # (B x L_tgt x H) -> (B x L_tgt x 2H)
+        # (B x 1 x H) -> (B x 1 x 2H)
         query_features = self._linear_query(query)
-        # (B x L_tgt x 2H) -> (B x L_tgt x 1 x 2H)
-        query_features = query_features.unsqueeze(2)
-        # (B x L_tgt x 1 x 2H) -> (B x L_tgt x L_src x 2H)
-        query_features = query_features.expand(batch_size, tgt_length, src_length, dim)
+        # # (B x 1 x 2H) -> (B x L_tgt x 1 x 2H)
+        # query_features = query_features.unsqueeze(2)
+        # (B x 1 x 2H) -> (B x L_src x 2H)
+        query_features = query_features.expand(batch_size, src_length, dim)
 
-        # (B x L_src x 2H) -> (B x 1 x L_src x 2H)
-        states_features = states_features.unsqueeze(1)
-        # (B x 1 x L_src x 2H) -> (B x L_tgt x L_src x 2H)
-        states_features = states_features.expand(batch_size, tgt_length, src_length, dim)
+        # # (B x L_src x 2H) -> (B x 1 x L_src x 2H)
+        # states_features = states_features.unsqueeze(1)
+        # # (B x 1 x L_src x 2H) -> (B x L_tgt x L_src x 2H)
+        # states_features = states_features.expand(batch_size, tgt_length, src_length, dim)
+        if self.is_coverage:
+            # (B x L_src x 1) -> (B x L_src x 2H)
+            coverages_features = self._linear_coverage(coverage)
+            # (B x L_src x 1) -> (B x 1 x L_src x 1)
+            coverages_features = coverages_features.unsqueeze(1)
+            # (B x 1 x L_src x 1) -> (B x L_tgt x L_src x 1)
+            coverages_features = coverages_features.expand(batch_size, tgt_length, src_length, dim)
 
-        # (B x L_src x 1) -> (B x L_src x 2H)
-        coverages_features = self._linear_coverage(coverage)
-        # (B x L_src x 1) -> (B x 1 x L_src x 1)
-        coverages_features = coverages_features.unsqueeze(1)
-        # (B x 1 x L_src x 1) -> (B x L_tgt x L_src x 1)
-        coverages_features = coverages_features.expand(batch_size, tgt_length, src_length, dim)
+            total_features = query_features + states_features + coverages_features
+        else:
+            total_features = query_features + states_features
         # (B x L_tgt x L_src x 1)
-        alignments = self._v(torch.tanh(query_features + states_features + coverages_features))
+        alignments = self._v(torch.tanh(total_features))
         # (B x L_tgt x L_src)
-        alignments = alignments.squeeze(3)
+        # alignments = alignments.squeeze(3)
         return alignments
 
     def forward(self,
@@ -79,11 +85,11 @@ class Attention(Module, Registrable):
         # (B, L_tgt, L_src)
         alignments = self.score(query, states, states_features, coverage)
         # Set padding to zero
-        alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(1), float('-inf'))
+        alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(2), float('-inf'))
         attentions = self._softmax(alignments)
         # (B, L_tgt, L_src) X (B, L_src, 2*H) = (B, L_tgt, 2*H)
-        hidden_context = torch.bmm(attentions, states)
+        hidden_context = torch.bmm(attentions.transpose(1,2), states)
         # (B, L_src, 1)
-        attentions = attentions.transpose(1, 2).contiguous()
+        # attentions = attentions.transpose(1, 2).contiguous()
         new_coverage = coverage + attentions
         return hidden_context, new_coverage, attentions

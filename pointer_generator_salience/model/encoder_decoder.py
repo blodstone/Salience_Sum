@@ -36,7 +36,8 @@ class EncoderDecoder(Model):
         # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
         self.coverage_lambda = coverage_lambda
         self.salience_lambda = salience_lambda
-        self.max_steps = max_steps
+        # For end and start tokens
+        self.max_steps = max_steps + 2
         self.source_embedder = source_embedder
         self.target_embedder = target_embedder
         self.target_embedder._modules['token_embedder_tokens'].weight = \
@@ -51,7 +52,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=1)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=5)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0
@@ -218,7 +219,7 @@ class EncoderDecoder(Model):
         all_attentions = []
         # Teacher Forcing
         if torch.rand(1).item() <= self.teacher_force_ratio:
-            embedded_tgt = self.target_embedder(target_tokens)
+            embedded_tgt = self.target_embedder(target_tokens)[:, :-1, :]
             for step, emb in enumerate(embedded_tgt.split(1, dim=1)):
                 state = self.decoder(emb, state)
                 all_class_probs.append(state['class_probs'])
@@ -228,7 +229,7 @@ class EncoderDecoder(Model):
             tokens = state["encoder_states"].new_full(
                 (state["encoder_states"].size(0),), fill_value=self.start_idx, dtype=torch.long)
             emb = self.target_embedder({'tokens': tokens})
-            for step in range(target_tokens['tokens'].size(1)):
+            for step in range(min(target_tokens['tokens'].size(1) - 1, self.max_steps - 2)):
                 state = self.decoder(emb, state)
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
@@ -261,8 +262,9 @@ class EncoderDecoder(Model):
         attentions = state['all_attentions']
         coverages = state['all_coverages']
         source_mask = state['source_mask']
-        target_mask = util.get_text_field_mask(target_tokens)
-        assert target_mask.size(1) == target_ids.size(1)
+        target_mask = util.get_text_field_mask(target_tokens)[:, :-1]
+        target = target_ids[:, 1:]
+        assert target_mask.size(1) == target.size(1)
         # (B, L, 1)
         length = all_class_probs.size(1)
         step_losses = all_class_probs.new_zeros((all_class_probs.size(0),))
@@ -276,9 +278,9 @@ class EncoderDecoder(Model):
         # cov_loss = torch.min(attentions, coverages).sum(1).unsqueeze(1)
         # loss = nll_loss + self.coverage_lambda * cov_loss
         # loss = target_mask.unsqueeze(1) * loss
+
         for i in range(length):
-            target = target_ids[:, i]
-            gold_probs = torch.gather(all_class_probs[:, i, :], 1, target.unsqueeze(1)).squeeze()
+            gold_probs = torch.gather(all_class_probs[:, i, :], 1, target[:, i].unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs)
 
             step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
