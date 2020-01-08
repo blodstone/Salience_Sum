@@ -54,7 +54,9 @@ class Decoder(Module, Registrable):
 
     def forward(self,
                 input_emb: torch.Tensor,
-                state: Dict[str, Union[torch.Tensor, Tuple, Dict[str, torch.Tensor]]]):
+                state: Dict[str, Union[torch.Tensor, Tuple, Dict[str, torch.Tensor]]],
+                is_coverage: bool,
+                ):
         source_ids = state['source_ids']
         max_oov = state['max_oov']
         states = state['encoder_states']
@@ -79,7 +81,7 @@ class Decoder(Module, Registrable):
         if self.is_attention:
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
             hidden_context, coverage, attention = self.attention(
-                prev_dec_state, states, states_features, source_mask, coverage)
+                prev_dec_state, states, states_features, source_mask, coverage, is_coverage)
         if self.is_attention:
             state['class_probs'] = self._build_class_logits(
                 attention, hidden_context, dec_state, input_emb, source_ids, max_oov)

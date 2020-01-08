@@ -36,6 +36,10 @@ class EncoderDecoder(Model):
         # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
         self.coverage_lambda = coverage_lambda
         self.salience_lambda = salience_lambda
+        if coverage_lambda == 0.0:
+            self.is_coverage = False
+        else:
+            self.is_coverage = True
         # For end and start tokens
         self.max_steps = max_steps + 2
         self.source_embedder = source_embedder
@@ -171,7 +175,7 @@ class EncoderDecoder(Model):
         emb = self.target_embedder({
             'tokens': last_predictions
         })
-        state = self.decoder(emb, state)
+        state = self.decoder(emb, state, self.is_coverage)
         return state['class_probs'].squeeze(1).log(), state
 
     def _predict_salience(self, state: Dict[str, torch.Tensor]) -> torch.Tensor:
@@ -221,7 +225,7 @@ class EncoderDecoder(Model):
         if torch.rand(1).item() <= self.teacher_force_ratio:
             embedded_tgt = self.target_embedder(target_tokens)[:, :-1, :]
             for step, emb in enumerate(embedded_tgt.split(1, dim=1)):
-                state = self.decoder(emb, state)
+                state = self.decoder(emb, state, self.is_coverage)
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
@@ -230,7 +234,7 @@ class EncoderDecoder(Model):
                 (state["encoder_states"].size(0),), fill_value=self.start_idx, dtype=torch.long)
             emb = self.target_embedder({'tokens': tokens})
             for step in range(min(target_tokens['tokens'].size(1) - 1, self.max_steps - 2)):
-                state = self.decoder(emb, state)
+                state = self.decoder(emb, state, self.is_coverage)
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
