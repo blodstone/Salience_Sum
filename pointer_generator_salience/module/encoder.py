@@ -37,7 +37,7 @@ class Encoder(Seq2SeqEncoder):
 
     def forward(self, embedded_src: torch.Tensor,
                 source_lengths: torch.Tensor) \
-            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         packed_src = pack_padded_sequence(embedded_src, source_lengths,
                                           batch_first=True, enforce_sorted=False)
         # noinspection PyTypeChecker
@@ -46,10 +46,11 @@ class Encoder(Seq2SeqEncoder):
         # noinspection PyTypeChecker
         states, _ = pad_packed_sequence(packed_states, batch_first=True)
         final_state = self.get_final_layer(final[0], states.size(0))
+        final_context_state = self.get_final_layer(final[1], states.size(0))
         # Save times for attention mechanism
         states_features = self._linear_source(states)
         assert states.size(2) == self.num_directions * self.hidden_size
-        return states_features, states, final_state
+        return states_features, states, final_state, final_context_state
 
     def get_final_layer(self, state, batch_size):
         # (B, Num_dir * D_h)

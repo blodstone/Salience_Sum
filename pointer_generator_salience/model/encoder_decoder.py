@@ -73,11 +73,11 @@ class EncoderDecoder(Model):
         }
         return state
 
-    def init_dec_state(self, state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    @staticmethod
+    def init_dec_state(state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         states = state['encoder_states']
         batch_size = states.size(0)
         length = states.size(1)
-        state['context'] = states.new_zeros((batch_size, 1, self.hidden_size))
         state['dec_state'] = state['hidden']
         state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
         state['hidden_context'] = state['hidden'].new_zeros(state['hidden'].size())
@@ -194,9 +194,11 @@ class EncoderDecoder(Model):
         embedded_src = self.source_embedder(source_tokens)
 
         # final_state = (last state, last context)
-        states_features, states, final_state = self.encoder(embedded_src, state['source_lengths'])
+        states_features, states, final_state, final_context_state = \
+            self.encoder(embedded_src, state['source_lengths'])
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
         state['hidden'] = final_state  # (B, L, Num Direction * D_h)
+        state['context'] = final_context_state  # (B, L, Num Direction * D_h)
         state['states_features'] = states_features  # (B, L, Num Direction * D_h)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state
