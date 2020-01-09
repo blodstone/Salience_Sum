@@ -1,381 +1,276 @@
-import torch
-from allennlp.common import Registrable
-
-from onmt.translate import penalties
-from onmt.translate.decode_strategy import DecodeStrategy
-from onmt.utils.misc import tile
-
+from typing import List, Callable, Tuple, Dict
 import warnings
 
+import torch
 
-class BeamSearch(DecodeStrategy, Registrable):
-    """Generation beam search.
+from allennlp.common.checks import ConfigurationError
 
-    Note that the attributes list is not exhaustive. Rather, it highlights
-    tensors to document their shape. (Since the state variables' "batch"
-    size decreases as beams finish, we denote this axis with a B rather than
-    ``batch_size``).
 
-    Args:
-        beam_size (int): Number of beams to use (see base ``parallel_paths``).
-        batch_size (int): See base.
-        pad (int): See base.
-        bos (int): See base.
-        eos (int): See base.
-        n_best (int): Don't stop until at least this many beams have
-            reached EOS.
-        global_scorer (onmt.translate.GNMTGlobalScorer): Scorer instance.
-        min_length (int): See base.
-        max_length (int): See base.
-        return_attention (bool): See base.
-        block_ngram_repeat (int): See base.
-        exclusion_tokens (set[int]): See base.
+StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
+StepFunctionType = Callable[[torch.Tensor, StateType, bool], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
 
-    Attributes:
-        top_beam_finished (ByteTensor): Shape ``(B,)``.
-        _batch_offset (LongTensor): Shape ``(B,)``.
-        _beam_offset (LongTensor): Shape ``(batch_size x beam_size,)``.
-        alive_seq (LongTensor): See base.
-        topk_log_probs (FloatTensor): Shape ``(B x beam_size,)``. These
-            are the scores used for the topk operation.
-        memory_lengths (LongTensor): Lengths of encodings. Used for
-            masking attentions.
-        select_indices (LongTensor or NoneType): Shape
-            ``(B x beam_size,)``. This is just a flat view of the
-            ``_batch_index``.
-        topk_scores (FloatTensor): Shape
-            ``(B, beam_size)``. These are the
-            scores a sequence will receive if it finishes.
-        topk_ids (LongTensor): Shape ``(B, beam_size)``. These are the
-            word indices of the topk predictions.
-        _batch_index (LongTensor): Shape ``(B, beam_size)``.
-        _prev_penalty (FloatTensor or NoneType): Shape
-            ``(B, beam_size)``. Initialized to ``None``.
-        _coverage (FloatTensor or NoneType): Shape
-            ``(1, B x beam_size, inp_seq_len)``.
-        hypotheses (list[list[Tuple[Tensor]]]): Contains a tuple
-            of score (float), sequence (long), and attention (float or None).
+
+class BeamSearch:
+    """
+    Implements the beam search algorithm for decoding the most likely sequences.
+
+    Parameters
+    ----------
+    end_index : ``int``
+        The index of the "stop" or "end" token in the target vocabulary.
+    max_steps : ``int``, optional (default = 50)
+        The maximum number of decoding steps to take, i.e. the maximum length
+        of the predicted sequences.
+    beam_size : ``int``, optional (default = 10)
+        The width of the beam used.
+    per_node_beam_size : ``int``, optional (default = beam_size)
+        The maximum number of candidates to consider per node, at each step in the search.
+        If not given, this just defaults to ``beam_size``. Setting this parameter
+        to a number smaller than ``beam_size`` may give better results, as it can introduce
+        more diversity into the search. See `Beam Search Strategies for Neural Machine Translation.
+        Freitag and Al-Onaizan, 2017 <https://arxiv.org/abs/1702.01806>`_.
     """
 
-    def __init__(self, beam_size, batch_size, pad, bos, eos, n_best,
-                 global_scorer, min_length, max_length, return_attention,
-                 block_ngram_repeat, exclusion_tokens,
-                 stepwise_penalty, ratio):
-        super(BeamSearch, self).__init__(
-            pad, bos, eos, batch_size, beam_size, min_length,
-            block_ngram_repeat, exclusion_tokens, return_attention,
-            max_length)
-        # beam parameters
-        self.global_scorer = global_scorer
+    def __init__(self,
+                 end_index: int,
+                 max_steps: int = 50,
+                 beam_size: int = 10,
+                 per_node_beam_size: int = None) -> None:
+        self._end_index = end_index
+        self.max_steps = max_steps
         self.beam_size = beam_size
-        self.n_best = n_best
-        self.ratio = ratio
+        self.per_node_beam_size = per_node_beam_size or beam_size
 
-        # result caching
-        self.hypotheses = [[] for _ in range(batch_size)]
-
-        # beam state
-        self.top_beam_finished = torch.zeros([batch_size], dtype=torch.uint8)
-        # BoolTensor was introduced in pytorch 1.2
-        try:
-            self.top_beam_finished = self.top_beam_finished.bool()
-        except AttributeError:
-            pass
-        self._batch_offset = torch.arange(batch_size, dtype=torch.long)
-
-        self.select_indices = None
-        self.done = False
-        # "global state" of the old beam
-        self._prev_penalty = None
-        self._coverage = None
-
-        self._stepwise_cov_pen = (
-            stepwise_penalty and self.global_scorer.has_cov_pen)
-        self._vanilla_cov_pen = (
-            not stepwise_penalty and self.global_scorer.has_cov_pen)
-        self._cov_pen = self.global_scorer.has_cov_pen
-
-    def initialize(self, memory_bank, src_lengths, src_map=None, device=None):
-        """Initialize for decoding.
-        Repeat src objects `beam_size` times.
+    def search(self,
+               start_predictions: torch.Tensor,
+               start_state: StateType,
+               step: StepFunctionType) -> Tuple[torch.Tensor, torch.Tensor]:
         """
+        Given a starting state and a step function, apply beam search to find the
+        most likely target sequences.
 
-        def fn_map_state(state, dim):
-            return tile(state, self.beam_size, dim=dim)
+        Notes
+        -----
+        If your step function returns ``-inf`` for some log probabilities
+        (like if you're using a masked log-softmax) then some of the "best"
+        sequences returned may also have ``-inf`` log probability. Specifically
+        this happens when the beam size is smaller than the number of actions
+        with finite log probability (non-zero probability) returned by the step function.
+        Therefore if you're using a mask you may want to check the results from ``search``
+        and potentially discard sequences with non-finite log probability.
 
-        if isinstance(memory_bank, tuple):
-            memory_bank = tuple(tile(x, self.beam_size, dim=1)
-                                for x in memory_bank)
-            mb_device = memory_bank[0].device
-        else:
-            memory_bank = tile(memory_bank, self.beam_size, dim=1)
-            mb_device = memory_bank.device
-        if src_map is not None:
-            src_map = tile(src_map, self.beam_size, dim=1)
-        if device is None:
-            device = mb_device
+        Parameters
+        ----------
+        start_predictions : ``torch.Tensor``
+            A tensor containing the initial predictions with shape ``(batch_size,)``.
+            Usually the initial predictions are just the index of the "start" token
+            in the target vocabulary.
+        start_state : ``StateType``
+            The initial state passed to the ``step`` function. Each value of the state dict
+            should be a tensor of shape ``(batch_size, *)``, where ``*`` means any other
+            number of dimensions.
+        step : ``StepFunctionType``
+            A function that is responsible for computing the next most likely tokens,
+            given the current state and the predictions from the last time step.
+            The function should accept two arguments. The first being a tensor
+            of shape ``(group_size,)``, representing the index of the predicted
+            tokens from the last time step, and the second being the current state.
+            The ``group_size`` will be ``batch_size * beam_size``, except in the initial
+            step, for which it will just be ``batch_size``.
+            The function is expected to return a tuple, where the first element
+            is a tensor of shape ``(group_size, target_vocab_size)`` containing
+            the log probabilities of the tokens for the next step, and the second
+            element is the updated state. The tensor in the state should have shape
+            ``(group_size, *)``, where ``*`` means any other number of dimensions.
 
-        self.memory_lengths = tile(src_lengths, self.beam_size)
-        super(BeamSearch, self).initialize(
-            memory_bank, self.memory_lengths, src_map, device)
-        self.best_scores = torch.full(
-            [self.batch_size], -1e10, dtype=torch.float, device=device)
-        self._beam_offset = torch.arange(
-            0, self.batch_size * self.beam_size, step=self.beam_size,
-            dtype=torch.long, device=device)
-        self.topk_log_probs = torch.tensor(
-            [0.0] + [float("-inf")] * (self.beam_size - 1), device=device
-        ).repeat(self.batch_size)
-        # buffers for the topk scores and 'backpointer'
-        self.topk_scores = torch.empty((self.batch_size, self.beam_size),
-                                       dtype=torch.float, device=device)
-        self.topk_ids = torch.empty((self.batch_size, self.beam_size),
-                                    dtype=torch.long, device=device)
-        self._batch_index = torch.empty([self.batch_size, self.beam_size],
-                                        dtype=torch.long, device=device)
-        return fn_map_state, memory_bank, self.memory_lengths, src_map
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Tuple of ``(predictions, log_probabilities)``, where ``predictions``
+            has shape ``(batch_size, beam_size, max_steps)`` and ``log_probabilities``
+            has shape ``(batch_size, beam_size)``.
+        """
+        batch_size = start_predictions.size()[0]
 
-    @property
-    def current_predictions(self):
-        return self.alive_seq[:, -1]
+        # List of (batch_size, beam_size) tensors. One for each time step. Does not
+        # include the start symbols, which are implicit.
+        predictions: List[torch.Tensor] = []
 
-    @property
-    def current_backptr(self):
-        # for testing
-        return self.select_indices.view(self.batch_size, self.beam_size)\
-            .fmod(self.beam_size)
+        # List of (batch_size, beam_size) tensors. One for each time step. None for
+        # the first.  Stores the index n for the parent prediction, i.e.
+        # predictions[t-1][i][n], that it came from.
+        backpointers: List[torch.Tensor] = []
 
-    @property
-    def batch_offset(self):
-        return self._batch_offset
+        # Calculate the first timestep. This is done outside the main loop
+        # because we are going from a single decoder input (the output from the
+        # encoder) to the top `beam_size` decoder outputs. On the other hand,
+        # within the main loop we are going from the `beam_size` elements of the
+        # beam to `beam_size`^2 candidates from which we will select the top
+        # `beam_size` elements for the next iteration.
+        # shape: (batch_size, num_classes)
+        start_class_log_probabilities, state = step(start_predictions, start_state, True)
 
-    def advance(self, log_probs, attn):
-        vocab_size = log_probs.size(-1)
+        num_classes = start_class_log_probabilities.size()[1]
 
-        # using integer division to get an integer _B without casting
-        _B = log_probs.shape[0] // self.beam_size
+        # Make sure `per_node_beam_size` is not larger than `num_classes`.
+        if self.per_node_beam_size > num_classes:
+            raise ConfigurationError(f"Target vocab size ({num_classes:d}) too small "
+                                     f"relative to per_node_beam_size ({self.per_node_beam_size:d}).\n"
+                                     f"Please decrease beam_size or per_node_beam_size.")
 
-        if self._stepwise_cov_pen and self._prev_penalty is not None:
-            self.topk_log_probs += self._prev_penalty
-            self.topk_log_probs -= self.global_scorer.cov_penalty(
-                self._coverage + attn, self.global_scorer.beta).view(
-                _B, self.beam_size)
+        # shape: (batch_size, beam_size), (batch_size, beam_size)
+        start_top_log_probabilities, start_predicted_classes = \
+                start_class_log_probabilities.topk(self.beam_size)
+        if self.beam_size == 1 and (start_predicted_classes == self._end_index).all():
+            warnings.warn("Empty sequences predicted. You may want to increase the beam size or ensure "
+                          "your step function is working properly.",
+                          RuntimeWarning)
+            return start_predicted_classes.unsqueeze(-1), start_top_log_probabilities
 
-        # force the output to be longer than self.min_length
-        step = len(self)
-        self.ensure_min_length(log_probs)
+        # The log probabilities for the last time step.
+        # shape: (batch_size, beam_size)
+        last_log_probabilities = start_top_log_probabilities
 
-        # Multiply probs by the beam probability.
-        log_probs += self.topk_log_probs.view(_B * self.beam_size, 1)
+        # shape: [(batch_size, beam_size)]
+        predictions.append(start_predicted_classes)
 
-        # if the sequence ends now, then the penalty is the current
-        # length + 1, to include the EOS token
-        length_penalty = self.global_scorer.length_penalty(
-            step + 1, alpha=self.global_scorer.alpha)
+        # Log probability tensor that mandates that the end token is selected.
+        # shape: (batch_size * beam_size, num_classes)
+        log_probs_after_end = start_class_log_probabilities.new_full(
+                (batch_size * self.beam_size, num_classes),
+                float("-inf")
+        )
+        log_probs_after_end[:, self._end_index] = 0.
 
-        curr_scores = log_probs / length_penalty
+        # Set the same state for each element in the beam.
+        for key, state_tensor in state.items():
+            _, *last_dims = state_tensor.size()
+            # shape: (batch_size * beam_size, *)
+            state[key] = state_tensor.\
+                    unsqueeze(1).\
+                    expand(batch_size, self.beam_size, *last_dims).\
+                    reshape(batch_size * self.beam_size, *last_dims)
 
-        # Avoid any direction that would repeat unwanted ngrams
-        self.block_ngram_repeats(curr_scores)
+        for timestep in range(self.max_steps - 1):
+            # shape: (batch_size * beam_size,)
+            last_predictions = predictions[-1].reshape(batch_size * self.beam_size)
 
-        # Flatten probs into a list of possibilities.
-        curr_scores = curr_scores.reshape(_B, self.beam_size * vocab_size)
-        torch.topk(curr_scores,  self.beam_size, dim=-1,
-                   out=(self.topk_scores, self.topk_ids))
+            # If every predicted token from the last step is `self._end_index`,
+            # then we can stop early.
+            if (last_predictions == self._end_index).all():
+                break
 
-        # Recover log probs.
-        # Length penalty is just a scalar. It doesn't matter if it's applied
-        # before or after the topk.
-        torch.mul(self.topk_scores, length_penalty, out=self.topk_log_probs)
+            # Take a step. This get the predicted log probs of the next classes
+            # and updates the state.
+            # shape: (batch_size * beam_size, num_classes)
+            class_log_probabilities, state = step(last_predictions, state, False)
 
-        # Resolve beam origin and map to batch index flat representation.
-        torch.div(self.topk_ids, vocab_size, out=self._batch_index)
-        self._batch_index += self._beam_offset[:_B].unsqueeze(1)
-        self.select_indices = self._batch_index.view(_B * self.beam_size)
-        self.topk_ids.fmod_(vocab_size)  # resolve true word ids
+            # shape: (batch_size * beam_size, num_classes)
+            last_predictions_expanded = last_predictions.unsqueeze(-1).expand(
+                    batch_size * self.beam_size,
+                    num_classes
+            )
 
-        # Append last prediction.
-        self.alive_seq = torch.cat(
-            [self.alive_seq.index_select(0, self.select_indices),
-             self.topk_ids.view(_B * self.beam_size, 1)], -1)
+            # Here we are finding any beams where we predicted the end token in
+            # the previous timestep and replacing the distribution with a
+            # one-hot distribution, forcing the beam to predict the end token
+            # this timestep as well.
+            # shape: (batch_size * beam_size, num_classes)
+            cleaned_log_probabilities = torch.where(
+                    last_predictions_expanded == self._end_index,
+                    log_probs_after_end,
+                    class_log_probabilities
+            )
 
-        self.maybe_update_forbidden_tokens()
+            # shape (both): (batch_size * beam_size, per_node_beam_size)
+            top_log_probabilities, predicted_classes = \
+                cleaned_log_probabilities.topk(self.per_node_beam_size)
 
-        if self.return_attention or self._cov_pen:
-            current_attn = attn.index_select(1, self.select_indices)
-            if step == 1:
-                self.alive_attn = current_attn
-                # update global state (step == 1)
-                if self._cov_pen:  # coverage penalty
-                    self._prev_penalty = torch.zeros_like(self.topk_log_probs)
-                    self._coverage = current_attn
-            else:
-                self.alive_attn = self.alive_attn.index_select(
-                    1, self.select_indices)
-                self.alive_attn = torch.cat([self.alive_attn, current_attn], 0)
-                # update global state (step > 1)
-                if self._cov_pen:
-                    self._coverage = self._coverage.index_select(
-                        1, self.select_indices)
-                    self._coverage += current_attn
-                    self._prev_penalty = self.global_scorer.cov_penalty(
-                        self._coverage, beta=self.global_scorer.beta).view(
-                            _B, self.beam_size)
+            # Here we expand the last log probabilities to (batch_size * beam_size, per_node_beam_size)
+            # so that we can add them to the current log probs for this timestep.
+            # This lets us maintain the log probability of each element on the beam.
+            # shape: (batch_size * beam_size, per_node_beam_size)
+            expanded_last_log_probabilities = last_log_probabilities.\
+                    unsqueeze(2).\
+                    expand(batch_size, self.beam_size, self.per_node_beam_size).\
+                    reshape(batch_size * self.beam_size, self.per_node_beam_size)
 
-        if self._vanilla_cov_pen:
-            # shape: (batch_size x beam_size, 1)
-            cov_penalty = self.global_scorer.cov_penalty(
-                self._coverage,
-                beta=self.global_scorer.beta)
-            self.topk_scores -= cov_penalty.view(_B, self.beam_size).float()
+            # shape: (batch_size * beam_size, per_node_beam_size)
+            summed_top_log_probabilities = top_log_probabilities + expanded_last_log_probabilities
 
-        self.is_finished = self.topk_ids.eq(self.eos)
-        self.ensure_max_length()
+            # shape: (batch_size, beam_size * per_node_beam_size)
+            reshaped_summed = summed_top_log_probabilities.\
+                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
 
-    def update_finished(self):
-        # Penalize beams that finished.
-        _B_old = self.topk_log_probs.shape[0]
-        step = self.alive_seq.shape[-1]  # 1 greater than the step in advance
-        self.topk_log_probs.masked_fill_(self.is_finished, -1e10)
-        # on real data (newstest2017) with the pretrained transformer,
-        # it's faster to not move this back to the original device
-        self.is_finished = self.is_finished.to('cpu')
-        self.top_beam_finished |= self.is_finished[:, 0].eq(1)
-        predictions = self.alive_seq.view(_B_old, self.beam_size, step)
-        attention = (
-            self.alive_attn.view(
-                step - 1, _B_old, self.beam_size, self.alive_attn.size(-1))
-            if self.alive_attn is not None else None)
-        non_finished_batch = []
-        for i in range(self.is_finished.size(0)):  # Batch level
-            b = self._batch_offset[i]
-            finished_hyp = self.is_finished[i].nonzero().view(-1)
-            # Store finished hypotheses for this batch.
-            for j in finished_hyp:  # Beam level: finished beam j in batch i
-                if self.ratio > 0:
-                    s = self.topk_scores[i, j] / (step + 1)
-                    if self.best_scores[b] < s:
-                        self.best_scores[b] = s
-                self.hypotheses[b].append((
-                    self.topk_scores[i, j],
-                    predictions[i, j, 1:],  # Ignore start_token.
-                    attention[:, i, j, :self.memory_lengths[i]]
-                    if attention is not None else None))
-            # End condition is the top beam finished and we can return
-            # n_best hypotheses.
-            if self.ratio > 0:
-                pred_len = self.memory_lengths[i] * self.ratio
-                finish_flag = ((self.topk_scores[i, 0] / pred_len)
-                               <= self.best_scores[b]) or \
-                    self.is_finished[i].all()
-            else:
-                finish_flag = self.top_beam_finished[i] != 0
-            if finish_flag and len(self.hypotheses[b]) >= self.n_best:
-                best_hyp = sorted(
-                    self.hypotheses[b], key=lambda x: x[0], reverse=True)
-                for n, (score, pred, attn) in enumerate(best_hyp):
-                    if n >= self.n_best:
-                        break
-                    self.scores[b].append(score)
-                    self.predictions[b].append(pred)  # ``(batch, n_best,)``
-                    self.attention[b].append(
-                        attn if attn is not None else [])
-            else:
-                non_finished_batch.append(i)
-        non_finished = torch.tensor(non_finished_batch)
-        # If all sentences are translated, no need to go further.
-        if len(non_finished) == 0:
-            self.done = True
-            return
+            # shape: (batch_size, beam_size * per_node_beam_size)
+            reshaped_predicted_classes = predicted_classes.\
+                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
 
-        _B_new = non_finished.shape[0]
-        # Remove finished batches for the next step.
-        self.top_beam_finished = self.top_beam_finished.index_select(
-            0, non_finished)
-        self._batch_offset = self._batch_offset.index_select(0, non_finished)
-        non_finished = non_finished.to(self.topk_ids.device)
-        self.topk_log_probs = self.topk_log_probs.index_select(0,
-                                                               non_finished)
-        self._batch_index = self._batch_index.index_select(0, non_finished)
-        self.select_indices = self._batch_index.view(_B_new * self.beam_size)
-        self.alive_seq = predictions.index_select(0, non_finished) \
-            .view(-1, self.alive_seq.size(-1))
-        self.topk_scores = self.topk_scores.index_select(0, non_finished)
-        self.topk_ids = self.topk_ids.index_select(0, non_finished)
-        if self.alive_attn is not None:
-            inp_seq_len = self.alive_attn.size(-1)
-            self.alive_attn = attention.index_select(1, non_finished) \
-                .view(step - 1, _B_new * self.beam_size, inp_seq_len)
-            if self._cov_pen:
-                self._coverage = self._coverage \
-                    .view(1, _B_old, self.beam_size, inp_seq_len) \
-                    .index_select(1, non_finished) \
-                    .view(1, _B_new * self.beam_size, inp_seq_len)
-                if self._stepwise_cov_pen:
-                    self._prev_penalty = self._prev_penalty.index_select(
-                        0, non_finished)
+            # Keep only the top `beam_size` beam indices.
+            # shape: (batch_size, beam_size), (batch_size, beam_size)
+            restricted_beam_log_probs, restricted_beam_indices = reshaped_summed.topk(self.beam_size)
 
+            # Use the beam indices to extract the corresponding classes.
+            # shape: (batch_size, beam_size)
+            restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices)
 
-class GNMTGlobalScorer(object):
-    """NMT re-ranking.
+            predictions.append(restricted_predicted_classes)
 
-    Args:
-       alpha (float): Length parameter.
-       beta (float):  Coverage parameter.
-       length_penalty (str): Length penalty strategy.
-       coverage_penalty (str): Coverage penalty strategy.
+            # shape: (batch_size, beam_size)
+            last_log_probabilities = restricted_beam_log_probs
 
-    Attributes:
-        alpha (float): See above.
-        beta (float): See above.
-        length_penalty (callable): See :class:`penalties.PenaltyBuilder`.
-        coverage_penalty (callable): See :class:`penalties.PenaltyBuilder`.
-        has_cov_pen (bool): See :class:`penalties.PenaltyBuilder`.
-        has_len_pen (bool): See :class:`penalties.PenaltyBuilder`.
-    """
+            # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
+            # indices with a common ancestor are grouped together. Hence
+            # dividing by per_node_beam_size gives the ancestor. (Note that this is integer
+            # division as the tensor is a LongTensor.)
+            # shape: (batch_size, beam_size)
+            backpointer = restricted_beam_indices / self.per_node_beam_size
 
-    @classmethod
-    def from_opt(cls, opt):
-        return cls(
-            opt.alpha,
-            opt.beta,
-            opt.length_penalty,
-            opt.coverage_penalty)
+            backpointers.append(backpointer)
 
-    def __init__(self, alpha, beta, length_penalty, coverage_penalty):
-        self._validate(alpha, beta, length_penalty, coverage_penalty)
-        self.alpha = alpha
-        self.beta = beta
-        penalty_builder = penalties.PenaltyBuilder(coverage_penalty,
-                                                   length_penalty)
-        self.has_cov_pen = penalty_builder.has_cov_pen
-        # Term will be subtracted from probability
-        self.cov_penalty = penalty_builder.coverage_penalty
+            # Keep only the pieces of the state tensors corresponding to the
+            # ancestors created this iteration.
+            for key, state_tensor in state.items():
+                _, *last_dims = state_tensor.size()
+                # shape: (batch_size, beam_size, *)
+                expanded_backpointer = backpointer.\
+                        view(batch_size, self.beam_size, *([1] * len(last_dims))).\
+                        expand(batch_size, self.beam_size, *last_dims)
 
-        self.has_len_pen = penalty_builder.has_len_pen
-        # Probability will be divided by this
-        self.length_penalty = penalty_builder.length_penalty
+                # shape: (batch_size * beam_size, *)
+                state[key] = state_tensor.\
+                        reshape(batch_size, self.beam_size, *last_dims).\
+                        gather(1, expanded_backpointer).\
+                        reshape(batch_size * self.beam_size, *last_dims)
 
-    @classmethod
-    def _validate(cls, alpha, beta, length_penalty, coverage_penalty):
-        # these warnings indicate that either the alpha/beta
-        # forces a penalty to be a no-op, or a penalty is a no-op but
-        # the alpha/beta would suggest otherwise.
-        if length_penalty is None or length_penalty == "none":
-            if alpha != 0:
-                warnings.warn("Non-default `alpha` with no length penalty. "
-                              "`alpha` has no effect.")
-        else:
-            # using some length penalty
-            if length_penalty == "wu" and alpha == 0.:
-                warnings.warn("Using length penalty Wu with alpha==0 "
-                              "is equivalent to using length penalty none.")
-        if coverage_penalty is None or coverage_penalty == "none":
-            if beta != 0:
-                warnings.warn("Non-default `beta` with no coverage penalty. "
-                              "`beta` has no effect.")
-        else:
-            # using some coverage penalty
-            if beta == 0.:
-                warnings.warn("Non-default coverage penalty with beta==0 "
-                              "is equivalent to using coverage penalty none.")
+        if not torch.isfinite(last_log_probabilities).all():
+            warnings.warn("Infinite log probabilities encountered. Some final sequences may not make sense. "
+                          "This can happen when the beam size is larger than the number of valid (non-zero "
+                          "probability) transitions that the step function produces.",
+                          RuntimeWarning)
+
+        # Reconstruct the sequences.
+        # shape: [(batch_size, beam_size, 1)]
+        reconstructed_predictions = [predictions[-1].unsqueeze(2)]
+
+        # shape: (batch_size, beam_size)
+        cur_backpointers = backpointers[-1]
+
+        for timestep in range(len(predictions) - 2, 0, -1):
+            # shape: (batch_size, beam_size, 1)
+            cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
+
+            reconstructed_predictions.append(cur_preds)
+
+            # shape: (batch_size, beam_size)
+            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
+
+        # shape: (batch_size, beam_size, 1)
+        final_preds = predictions[0].gather(1, cur_backpointers).unsqueeze(2)
+
+        reconstructed_predictions.append(final_preds)
+
+        # shape: (batch_size, beam_size, max_steps)
+        all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
+
+        return all_predictions, last_log_probabilities

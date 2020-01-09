@@ -33,7 +33,7 @@ class Decoder(Module, Registrable):
             self.is_attention = True
             self.attention = attention
             self._p_gen = Sequential(
-                Linear(2*self.hidden_size + 2*self.hidden_size + self.input_size, 1, bias=True),
+                Linear(4*self.hidden_size + self.input_size, 1, bias=True),
                 Sigmoid()
             )
         self.gen_vocab_dist = None
@@ -56,6 +56,8 @@ class Decoder(Module, Registrable):
                 input_emb: torch.Tensor,
                 state: Dict[str, Union[torch.Tensor, Tuple, Dict[str, torch.Tensor]]],
                 is_coverage: bool,
+                is_training: bool = True,
+                is_first_step: bool = False,
                 ):
         source_ids = state['source_ids']
         max_oov = state['max_oov']
@@ -71,20 +73,25 @@ class Decoder(Module, Registrable):
         batch_size = input_emb.size(0)
         hidden_context = state['hidden_context']
         attention = None
-
-        dec_state, final = self.rnn(
-            self.input_context(
-                torch.cat((hidden_context, input_emb), dim=2)),
+        if not is_training and is_first_step:
+            if self.is_attention:
+                # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
+                _, coverage, _ = self.attention(
+                    prev_dec_state, states, states_features, source_mask, coverage, is_coverage)
+        x = self.input_context(torch.cat((hidden_context, input_emb), dim=2))
+        dec_state, final = self.rnn(x,
             (hidden.view(-1, batch_size, 2*self.hidden_size),
              context.view(-1, batch_size, 2*self.hidden_size))
         )
         if self.is_attention:
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
-            hidden_context, coverage, attention = self.attention(
-                prev_dec_state, states, states_features, source_mask, coverage, is_coverage)
+            hidden_context, next_coverage, attention = self.attention(
+                dec_state, states, states_features, source_mask, coverage, is_coverage)
+        if not is_first_step or is_training:
+            coverage = next_coverage
         if self.is_attention:
             state['class_probs'] = self._build_class_logits(
-                attention, hidden_context, dec_state, input_emb, source_ids, max_oov)
+                attention, hidden_context, dec_state, x, source_ids, max_oov)
         else:
             state['class_probs'] = self._build_class_logits_no_attn(dec_state)
         state['dec_state'] = dec_state

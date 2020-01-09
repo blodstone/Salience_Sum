@@ -7,11 +7,11 @@ from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, DEFAULT_OOV_TOKEN
 from allennlp.models import Model
 from allennlp.modules import TextFieldEmbedder
 from allennlp.nn import RegularizerApplicator, util
-from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_lengths_from_binary_sequence_mask
 from torch.distributions import Categorical, Gumbel
 from torch.nn import CrossEntropyLoss, Softmax, MSELoss, NLLLoss
 
+from pointer_generator_salience.module.beam_search import BeamSearch
 from pointer_generator_salience.module.decoder import Decoder
 from pointer_generator_salience.module.encoder import Encoder
 from pointer_generator_salience.module.salience_predictor import SaliencePredictor
@@ -140,12 +140,15 @@ class EncoderDecoder(Model):
 
     def take_step(self,
                   last_predictions: torch.Tensor,
-                  state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+                  state: Dict[str, torch.Tensor],
+                  is_first_step: bool = False) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Take a decoding step. This is called by the beam search class.
 
         Parameters
         ----------
+        is_first_step : ``bool``
+            Denoting that it is a first step
         last_predictions : ``torch.Tensor``
             A tensor of shape ``(group_size,)``, which gives the indices of the predictions
             during the last time step.
@@ -175,7 +178,7 @@ class EncoderDecoder(Model):
         emb = self.target_embedder({
             'tokens': last_predictions
         })
-        state = self.decoder(emb, state, self.is_coverage)
+        state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
         return state['class_probs'].squeeze(1).log(), state
 
     def _predict_salience(self, state: Dict[str, torch.Tensor]) -> torch.Tensor:
