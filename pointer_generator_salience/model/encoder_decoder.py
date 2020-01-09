@@ -266,7 +266,6 @@ class EncoderDecoder(Model):
         # (B, L, V)
         all_class_probs = state['all_class_probs']
         attentions = state['all_attentions']
-        coverages = state['all_coverages']
         source_mask = state['source_mask']
         target_mask = util.get_text_field_mask(target_tokens)[:, :-1]
         target = target_ids[:, 1:]
@@ -275,6 +274,7 @@ class EncoderDecoder(Model):
         length = all_class_probs.size(1)
         step_losses = all_class_probs.new_zeros((all_class_probs.size(0),))
         target_mask_t = target_mask.transpose(0, 1).contiguous()
+        coverages = state['all_coverages']
         coverage_losses = all_class_probs.new_zeros((all_class_probs.size(0),))
         # batch_size, length, class_size,  = all_class_probs.size()
         # gold_probs = torch.gather(
@@ -288,21 +288,21 @@ class EncoderDecoder(Model):
         for i in range(length):
             gold_probs = torch.gather(all_class_probs[:, i, :], 1, target[:, i].unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs)
-
-            step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
-            step_loss = step_loss + self.coverage_lambda * step_coverage_loss
+            if self.is_coverage:
+                step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
+                step_loss = step_loss + self.coverage_lambda * step_coverage_loss
+                step_coverage_loss = step_coverage_loss * target_mask_t[i]
+                coverage_losses += step_coverage_loss
             step_loss = step_loss * target_mask_t[i]
-
-            # For metric display
-            step_coverage_loss = step_coverage_loss * target_mask_t[i]
-
             step_losses += step_loss
-            coverage_losses += step_coverage_loss
 
-        batch_coverage_loss = coverage_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
+        if self.is_coverage:
+            batch_coverage_loss = coverage_losses / \
+                                  util.get_lengths_from_binary_sequence_mask(target_mask)
+            total_coverage_loss = torch.mean(batch_coverage_loss)
+            self.coverage_loss = total_coverage_loss.item()
         batch_avg_loss = step_losses / util.get_lengths_from_binary_sequence_mask(target_mask)
         total_loss = torch.mean(batch_avg_loss)
-        total_coverage_loss = torch.mean(batch_coverage_loss)
         # loss = self.criterion(
         #     all_class_log_probs[:, :-1, :].transpose(1, 2),
         #     target_ids[:, 1:all_class_log_probs.size(1)])
@@ -313,7 +313,6 @@ class EncoderDecoder(Model):
             salience_loss = self.prediction_criterion(predicted_salience, salience_values)
             total_loss = total_loss + self.salience_lambda * salience_loss
             self.salience_MSE = salience_loss.item()
-        self.coverage_loss = total_coverage_loss.item()
         return total_loss
 
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
