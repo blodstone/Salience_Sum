@@ -78,9 +78,9 @@ class EncoderDecoder(Model):
         states = state['encoder_states']
         batch_size = states.size(0)
         length = states.size(1)
-        state['dec_state'] = state['hidden']
+        state['dec_state'] = torch.cat((state['hidden'], state['context']), dim=2)
         state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
-        state['hidden_context'] = state['hidden'].new_zeros(state['hidden'].size())
+        state['hidden_context'] = state['dec_state'].new_zeros(state['dec_state'].size())
         return state
 
     def forward(self,
@@ -230,7 +230,11 @@ class EncoderDecoder(Model):
         if torch.rand(1).item() <= self.teacher_force_ratio:
             embedded_tgt = self.target_embedder(target_tokens)[:, :-1, :]
             for step, emb in enumerate(embedded_tgt.split(1, dim=1)):
-                state = self.decoder(emb, state, self.is_coverage)
+                if step == 0:
+                    is_first_step = True
+                else:
+                    is_first_step = False
+                state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
@@ -239,7 +243,11 @@ class EncoderDecoder(Model):
                 (state["encoder_states"].size(0),), fill_value=self.start_idx, dtype=torch.long)
             emb = self.target_embedder({'tokens': tokens})
             for step in range(min(target_tokens['tokens'].size(1) - 1, self.max_steps - 2)):
-                state = self.decoder(emb, state, self.is_coverage)
+                if step == 0:
+                    is_first_step = True
+                else:
+                    is_first_step = False
+                state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])

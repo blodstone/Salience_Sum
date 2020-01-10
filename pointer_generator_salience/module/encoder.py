@@ -34,6 +34,14 @@ class Encoder(Seq2SeqEncoder):
                         bidirectional=bidirectional,
                         batch_first=True)
         self._linear_source = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=False)
+        self._reduce_h = Sequential(
+            Linear(hidden_size * self.num_directions, hidden_size, bias=True),
+            ReLU()
+        )
+        self._reduce_c = Sequential(
+            Linear(hidden_size * self.num_directions, hidden_size, bias=True),
+            ReLU()
+        )
 
     def forward(self, embedded_src: torch.Tensor,
                 source_lengths: torch.Tensor) \
@@ -45,8 +53,8 @@ class Encoder(Seq2SeqEncoder):
         # states = (B x L X num_dir*D_h) , last layer
         # noinspection PyTypeChecker
         states, _ = pad_packed_sequence(packed_states, batch_first=True)
-        final_state = self.get_final_layer(final[0], states.size(0))
-        final_context_state = self.get_final_layer(final[1], states.size(0))
+        final_state = self._reduce_h(self.get_final_layer(final[0], states.size(0)))
+        final_context_state = self._reduce_c(self.get_final_layer(final[1], states.size(0)))
         # Save times for attention mechanism
         states_features = self._linear_source(states)
         assert states.size(2) == self.num_directions * self.hidden_size
