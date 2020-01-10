@@ -67,10 +67,10 @@ local CUDA=0;
     "summary_interval": 500,
     "histogram_interval": 1000,
     "num_epochs": 50,
-    "patience": 4,
+    "patience": 5,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
-    "grad_norm": 2,
+    "grad_clipping": 2,
     "optimizer": {
       "type": "adagrad",
       "lr": 0.15,
