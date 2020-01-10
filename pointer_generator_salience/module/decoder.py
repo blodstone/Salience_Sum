@@ -26,14 +26,14 @@ class Decoder(Module, Registrable):
                         num_layers=self.num_layers,
                         batch_first=True)
         self.input_context = Linear(
-            2*hidden_size + input_size, input_size)
+            2 * hidden_size + input_size, input_size)
         if attention is None:
             self.is_attention = False
         else:
             self.is_attention = True
             self.attention = attention
             self._p_gen = Sequential(
-                Linear(4*self.hidden_size + self.input_size, 1, bias=True),
+                Linear(4 * self.hidden_size + self.input_size, 1, bias=True),
                 Sigmoid()
             )
         self.gen_vocab_dist = None
@@ -41,8 +41,8 @@ class Decoder(Module, Registrable):
     def add_vocab(self, vocab: Vocabulary):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
-            Linear(4*self.hidden_size, 2*self.hidden_size, bias=True),
-            Linear(2*self.hidden_size, self.vocab.get_vocab_size(), bias=True),
+            Linear(4 * self.hidden_size, 2 * self.hidden_size, bias=True),
+            Linear(2 * self.hidden_size, self.vocab.get_vocab_size(), bias=True),
             Softmax(dim=-1)
         )
 
@@ -65,7 +65,7 @@ class Decoder(Module, Registrable):
         states_features = state['states_features']
         hidden = state['hidden']
         context = state['context']
-        prev_dec_state = state['dec_state']
+        dec_state = state['dec_state']
         source_mask = state['source_mask']
         coverage = state['coverage']
         if len(input_emb.size()) == 2:
@@ -73,22 +73,22 @@ class Decoder(Module, Registrable):
         batch_size = input_emb.size(0)
         hidden_context = state['hidden_context']
         attention = None
-        if not is_training and is_first_step:
+        if is_first_step:
             if self.is_attention:
-                # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
-                _, coverage, _ = self.attention(
-                    prev_dec_state, states, states_features, source_mask, coverage, is_coverage)
+                # Attention step 0 to calculate coverage step 1
+                hidden_context, coverage, _ = self.attention(
+                    dec_state, states, states_features, source_mask, coverage, is_coverage)
         x = self.input_context(torch.cat((hidden_context, input_emb), dim=2))
         dec_state, final = self.rnn(x,
-            (hidden.view(-1, batch_size, 2*self.hidden_size),
-             context.view(-1, batch_size, 2*self.hidden_size))
-        )
+                                    (hidden.view(-1, batch_size, 2 * self.hidden_size),
+                                     context.view(-1, batch_size, 2 * self.hidden_size))
+                                    )
         if self.is_attention:
             # Dec_state (s_{j-1} is initialized with the last encoder hidden state (h_n))
             hidden_context, next_coverage, attention = self.attention(
                 dec_state, states, states_features, source_mask, coverage, is_coverage)
-        if not is_first_step or is_training:
-            coverage = next_coverage
+            if not is_first_step:
+                coverage = next_coverage
         if self.is_attention:
             state['class_probs'] = self._build_class_logits(
                 attention, hidden_context, dec_state, x, source_ids, max_oov)
@@ -112,12 +112,13 @@ class Decoder(Module, Registrable):
                             ) -> torch.Tensor:
         p_gen = self._p_gen(torch.cat((hidden_context, dec_state, input_emb), dim=2))
         vocab_dist = (p_gen * self.gen_vocab_dist(torch.cat((hidden_context, dec_state), dim=2))).squeeze(1)
-        if (max_oov.max()+1).item() > self.vocab.get_vocab_size():
-            extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max()+1])
+        if (max_oov.max() + 1).item() > self.vocab.get_vocab_size():
+            extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max() + 1])
             extended_vocab[:, :vocab_dist.size(1)] = vocab_dist
         else:
             extended_vocab = vocab_dist
-        attn_dist = ((1 - p_gen) * attention).squeeze(2)
+
+        attn_dist = ((p_gen.new_ones(p_gen.size()) - p_gen) * attention).squeeze(2)
         final_dist = extended_vocab.scatter_add(1, source_ids, attn_dist).unsqueeze(1)
         return final_dist + 1e-13
 
