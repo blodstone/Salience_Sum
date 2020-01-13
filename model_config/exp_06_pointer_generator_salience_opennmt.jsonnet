@@ -21,7 +21,7 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 0.8,
+    "teacher_force_ratio": 1.0,
     "coverage_lambda": 0.0,
     "salience_lambda": 0.0,
     "decoder": {
@@ -31,7 +31,6 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
-      "num_layers": 1,
     },
     "salience_predictor": {
       "hidden_size": HIDDEN,
