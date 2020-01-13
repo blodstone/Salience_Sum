@@ -101,8 +101,11 @@ class Decoder(Module, Registrable):
                             ) -> Tuple[torch.Tensor, torch.Tensor]:
         p_gen = self._p_gen(decoder_output)
         vocab_dist = (p_gen * self.gen_vocab_dist(decoder_output)).squeeze(1)
-        extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max() + 1])
-        extended_vocab[:, :vocab_dist.size(1)] = vocab_dist
+        if (max_oov.max() + 1).item() > self.vocab.get_vocab_size():
+            extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max() + 1])
+            extended_vocab[:, :vocab_dist.size(1)] = vocab_dist
+        else:
+            extended_vocab = vocab_dist
 
         attn_dist = ((p_gen.new_ones(p_gen.size()) - p_gen) * attention).squeeze(2)
         final_dist = extended_vocab.scatter_add(1, source_ids, attn_dist).unsqueeze(1)
