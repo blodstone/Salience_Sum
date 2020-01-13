@@ -21,7 +21,7 @@ class Encoder(Seq2SeqEncoder):
                  bidirectional,
                  stateful: bool = False) -> None:
         super().__init__(stateful)
-        self.hidden_size = hidden_size
+        self.hidden_size = hidden_size // 2
         if bidirectional:
             self.num_directions = 2
         else:
@@ -33,13 +33,13 @@ class Encoder(Seq2SeqEncoder):
                         num_layers=self.num_layers,
                         bidirectional=bidirectional,
                         batch_first=True)
-        self._linear_source = Linear(hidden_size * self.num_directions, hidden_size * self.num_directions, bias=False)
+        self._linear_source = Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=False)
         self._reduce_h = Sequential(
-            Linear(hidden_size * self.num_directions, hidden_size, bias=True),
+            Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=True),
             ReLU()
         )
         self._reduce_c = Sequential(
-            Linear(hidden_size * self.num_directions, hidden_size, bias=True),
+            Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=True),
             ReLU()
         )
 
@@ -52,28 +52,20 @@ class Encoder(Seq2SeqEncoder):
         packed_states, final = self.rnn(packed_src)
         # states = (B x L X num_dir*D_h) , last layer
         # noinspection PyTypeChecker
-        states, _ = pad_packed_sequence(packed_states, batch_first=True)
-        final_state = self._reduce_h(self.get_final_layer(final[0], states.size(0)))
-        final_context_state = self._reduce_c(self.get_final_layer(final[1], states.size(0)))
+        states, length = pad_packed_sequence(packed_states, batch_first=True)
+        final_state = self._reduce_h(self.get_final_layer(final[0]))
+        final_context_state = self._reduce_c(self.get_final_layer(final[1]))
         # Save times for attention mechanism
         states_features = self._linear_source(states)
         assert states.size(2) == self.num_directions * self.hidden_size
         return states_features, states, final_state, final_context_state
 
-    def get_final_layer(self, state, batch_size):
+    @staticmethod
+    def get_final_layer(state):
         # (B, Num_dir * D_h)
-        last_layer_state = state.view(self.num_layers,
-                                      batch_size,
-                                      self.num_directions * self.hidden_size)[-1]
-        assert last_layer_state.size(0) == batch_size, f'{last_layer_state.size(0)}'
-        assert last_layer_state.size(1) == self.num_directions * self.hidden_size\
-            , f'{last_layer_state.size(1)}'
-        last_layer_state = last_layer_state.unsqueeze(1)
-        assert last_layer_state.size(0) == batch_size, f'{last_layer_state.size(0)}'
-        assert last_layer_state.size(1) == 1, f'{last_layer_state.size(1)}'
-        assert last_layer_state.size(2) == self.hidden_size * 2, f'{last_layer_state.size(2)}'
-        assert len(last_layer_state.shape) == 3
-        return last_layer_state
+        state = torch.cat([state[0:state.size(0):2],
+                           state[1:state.size(0):2]], 2)
+        return state[-1].unsqueeze(0)
 
     def get_input_dim(self) -> int:
         return self.input_size

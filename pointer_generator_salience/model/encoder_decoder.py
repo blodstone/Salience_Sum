@@ -56,11 +56,12 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=5)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10, per_node_beam_size=5)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.prediction_criterion = MSELoss()
         self.salience_MSE = 0.0
         self.coverage_loss = 0.0
+        self.p_gen = 0.0
 
     # noinspection PyMethodMayBeStatic
     def init_enc_state(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -78,6 +79,7 @@ class EncoderDecoder(Model):
         states = state['encoder_states']
         batch_size = states.size(0)
         length = states.size(1)
+        state['input_feed'] = states.new_zeros((batch_size, 1, states.size(2)))
         state['dec_state'] = torch.cat((state['hidden'], state['context']), dim=2)
         state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
         state['hidden_context'] = state['dec_state'].new_zeros(state['dec_state'].size())
@@ -86,6 +88,7 @@ class EncoderDecoder(Model):
     def forward(self,
                 source_tokens: Dict[str, torch.Tensor],
                 source_text: Dict[str, Any],
+                target_text: Dict[str, Any],
                 source_ids: Dict[str, torch.Tensor],
                 target_tokens: Dict[str, torch.Tensor] = None,
                 target_ids: torch.Tensor = None,
@@ -226,6 +229,7 @@ class EncoderDecoder(Model):
         all_coverages = [state['source_mask'].new_zeros(
             (batch_size, length, 1), dtype=torch.float)]
         all_attentions = []
+        all_pgens = []
         # Teacher Forcing
         if torch.rand(1).item() <= self.teacher_force_ratio:
             embedded_tgt = self.target_embedder(target_tokens)[:, :-1, :]
@@ -238,6 +242,7 @@ class EncoderDecoder(Model):
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
+                all_pgens.append(state['p_gen'])
         else:
             tokens = state["encoder_states"].new_full(
                 (state["encoder_states"].size(0),), fill_value=self.start_idx, dtype=torch.long)
@@ -251,6 +256,7 @@ class EncoderDecoder(Model):
                 all_class_probs.append(state['class_probs'])
                 all_coverages.append(state['coverage'])
                 all_attentions.append(state['attention'])
+                all_pgens.append(state['p_gen'])
                 class_prob = all_class_probs[-1].squeeze(1)
                 # gumbel_sample = gumbel.rsample(class_logit.size()).squeeze(2)
                 # _, tokens = (class_logit + gumbel_sample).topk(1)
@@ -263,6 +269,7 @@ class EncoderDecoder(Model):
         state['all_class_probs'] = torch.cat(all_class_probs, dim=1)
         state['all_coverages'] = torch.cat(all_coverages[:-1], dim=2)
         state['all_attentions'] = torch.cat(all_attentions, dim=2)
+        self.p_gen = torch.cat(all_pgens, dim=1).mean().item()
         state.pop('class_probs', None)
         state.pop('coverage', None)
         state.pop('attention', None)
@@ -298,7 +305,7 @@ class EncoderDecoder(Model):
 
         for i in range(length):
             gold_probs = torch.gather(all_class_probs[:, i, :], 1, target[:, i].unsqueeze(1)).squeeze()
-            step_loss = -torch.log(gold_probs)
+            step_loss = -torch.log(gold_probs + 1e-7)
             if self.is_coverage:
                 step_coverage_loss = torch.sum(torch.min(attentions[:, :, i], coverages[:, :, i]), 1)
                 step_loss = step_loss + self.coverage_lambda * step_coverage_loss
@@ -329,11 +336,13 @@ class EncoderDecoder(Model):
     def get_metrics(self, reset: bool = False) -> Dict[str, float]:
         metrics_to_return = {
             'salience_MSE': self.salience_MSE,
-            'coverage_loss': self.coverage_loss
+            'coverage_loss': self.coverage_loss,
+            'p_gen': self.p_gen
         }
         if reset:
             self.salience_MSE = 0.0
             self.coverage_loss = 0.0
+            self.p_gen = 0.0
         return metrics_to_return
 
     # def _predict(self, source_tokens: Dict[str, torch.Tensor], state: Dict[str, torch.Tensor]):

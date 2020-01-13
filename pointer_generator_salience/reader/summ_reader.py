@@ -88,8 +88,10 @@ class SummDataReader(DatasetReader):
             target_ids_field = TargetCopyField(tokenized_src,
                                                tokenized_tgt,
                                                self._target_max_tokens)
+            target_text_field = MetadataField(metadata=tokenized_tgt)
             output_field['target_tokens'] = target_field
             output_field['target_ids'] = target_ids_field
+            output_field['target_text'] = target_text_field
         if salience_seq:
             if self._interpolation:
                 salience_field = ArrayField(
