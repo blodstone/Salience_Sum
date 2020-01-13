@@ -11,23 +11,23 @@
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/dev_bbc/train.dev.tsv.tagged.small",
-  "validation_data_path": "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/dev_bbc/val.dev.tsv.tagged.small",
+  "train_data_path": "data/bbc_allen/train.tsv.tagged",
+  "validation_data_path": "data/bbc_allen/validation.tsv.tagged",
   "model": {
     "type": "crf_tagger",
     "text_field_embedder": {
       "token_embedders": {
         "tokens": {
           "type": "embedding",
-          "embedding_dim": 256
+          "embedding_dim": 128
         }
       }
     },
     "encoder": {
       "type": "gru",
-      "input_size": 256,
-      "hidden_size": 512,
-      "num_layers": 2,
+      "input_size": 128,
+      "hidden_size": 256,
+      "num_layers": 1,
       "dropout": 0.0,
       "bidirectional": true
     },
