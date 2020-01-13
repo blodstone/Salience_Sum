@@ -35,7 +35,7 @@
       ["transitions$", {"type": "l2", "alpha": 0.01}]
     ]
   },
-  "iterator": {"type": "basic", "batch_size": 16},
+  "iterator": {"type": "basic", "batch_size": 32},
   "trainer": {
     "optimizer": "adam",
     "num_epochs": 50,
