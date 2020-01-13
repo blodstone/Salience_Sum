@@ -31,7 +31,7 @@ class Decoder(Module, Registrable):
             self.is_attention = True
             self.attention = attention
             self._p_gen = Sequential(
-                Linear(2 * self.hidden_size + self.input_size, 1, bias=True),
+                Linear(self.hidden_size, 1, bias=True),
                 Sigmoid()
             )
         self.gen_vocab_dist = None
@@ -99,7 +99,7 @@ class Decoder(Module, Registrable):
                             source_ids: torch.Tensor,
                             max_oov: torch.Tensor
                             ) -> Tuple[torch.Tensor, torch.Tensor]:
-        p_gen = self._p_gen(torch.cat((decoder_output, rnn_output, x), dim=2))
+        p_gen = self._p_gen(decoder_output)
         vocab_dist = (p_gen * self.gen_vocab_dist(decoder_output)).squeeze(1)
         extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max() + 1])
         extended_vocab[:, :vocab_dist.size(1)] = vocab_dist
