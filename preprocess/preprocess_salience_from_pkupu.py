@@ -10,7 +10,7 @@ from noisy_salience_model import AKE
 from noisy_salience_model import NER
 
 nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'tagger', 'entity_linker'])
-i = 0
+
 
 def gen_doc_sum(document_path, summary_path, list_name):
     # document_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/restbody'
@@ -73,10 +73,6 @@ def process_results(results):
 
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
-    # print("Process doc {}".format(doc_f))
-    # doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
-    # gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
-    # nlp_doc = nlp(doc)
     # Every token start with zero salience
     result_labels = [0 for sent in doc for _ in sent.split()]
     tokens = [word.strip().lower() for sent in doc for word in sent.split()]
@@ -110,7 +106,7 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     for token, value in zip(tokens, result_labels):
         new_docs.append('{}u"￨"{}'.format(token, value))
     print(f'{gold_f} and {doc_f}')
-    return '{}\t{}\n'.format(' '.join(new_docs), gold)
+    return '{}\t{}\n'.format(' '.join(new_docs), gold[0])
 
 
 def main():
