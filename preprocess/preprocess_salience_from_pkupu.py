@@ -12,6 +12,7 @@ from noisy_salience_model import NER
 nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'tagger', 'entity_linker'])
 i = 0
 
+
 def gen_doc_sum(document_path, summary_path, list_name):
     # document_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/restbody'
     # summary_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/firstsentence'
@@ -21,31 +22,6 @@ def gen_doc_sum(document_path, summary_path, list_name):
         with open(os.path.join(document_path, doc_f)) as doc:
             with open(os.path.join(summary_path, summ_f)) as summ:
                 yield doc.readlines(), doc_f, summ.readlines(), summ_f
-
-
-def retrieve(doc_path, summ_path):
-    contents = []
-    doc_files = [(name, int(name.split('.')[0])) for name in os.listdir(doc_path)]
-    doc_files.sort(key=lambda x: x[1])
-    summ_files = [(name, int(name.split('.')[0])) for name in os.listdir(summ_path)]
-    summ_files.sort(key=lambda x: x[1])
-    for doc, summ in zip(doc_files, summ_files):
-        doc_file = doc[0]
-        summ_file = summ[0]
-        if doc_file != summ_file:
-            print('Error')
-            break
-        else:
-            doc = open(os.path.join(doc_path, doc_file)).readlines()[0]
-            summ_content = list(open(os.path.join(summ_path, summ_file)).readlines())
-            if len(summ_content) == 0:
-                print('Empty summary on file: {} of {}'.format(summ_file, summ_path))
-                summ = ''
-            else:
-                summ = summ_content[0]
-            content = '{}\t{}'.format(doc, summ)
-        contents.append(content)
-    return contents
 
 
 def process_gold_result(gold_result):
@@ -73,10 +49,6 @@ def process_results(results):
 
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
-    # print("Process doc {}".format(doc_f))
-    # doc = open(os.path.join(doc_path, doc_set[0])).readlines()[0]
-    # gold = open(os.path.join(gold_path, gold_set[0])).readlines()[0]
-    # nlp_doc = nlp(doc)
     # Every token start with zero salience
     result_labels = [0 for sent in doc for _ in sent.split()]
     tokens = [word.strip().lower() for sent in doc for word in sent.split()]
@@ -88,29 +60,29 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
             # Some system produce no summary, because the document has only one sentence
             if len(summ_content) != 0:
                 for summ_sent in summ_content:
-                    for i, doc_sent in enumerate(doc):
+                    for k, doc_sent in enumerate(doc):
                         if doc_sent.replace(' ', '').replace('\n', '').lower() \
                                 == summ_sent.replace(' ', '').replace('\n', ''):
                             idx = 0
                             for j, sent in enumerate(doc):
                                 for _ in sent.split():
-                                    if i == j:
+                                    if k == j:
                                         result_labels[idx] += 1
                                     idx += 1
         elif summ_group == 'AKE':
             window = args.window
             results = AKE.run(max_words, window, doc)
             assert len(result_labels) == len(results)
-            result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
+            result_labels = [result_labels[k] + results[k] for k, v in enumerate(results)]
         elif summ_group == 'NER':
             results = NER.run(max_words, doc, nlp)
             assert len(result_labels) == len(results)
-            result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
+            result_labels = [result_labels[k] + results[k] for k, v in enumerate(results)]
     new_docs = []
     for token, value in zip(tokens, result_labels):
         new_docs.append('{}u"￨"{}'.format(token, value))
     print(f'{gold_f} and {doc_f}')
-    return '{}\t{}\n'.format(' '.join(new_docs), gold)
+    return '{}\t{}\n'.format(' '.join(new_docs), gold[0])
 
 
 def main():
