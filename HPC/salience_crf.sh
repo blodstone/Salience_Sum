@@ -17,6 +17,6 @@ mkdir -p $OUTPUT
 
 module load apps/python/conda
 module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
-source activate freya
+source activate gwen
 
-allennlp train -s $MODEL/crf --include-package salience_sum -r
+allennlp train -s $MODEL/crf --include-package salience_sum_crf -r
