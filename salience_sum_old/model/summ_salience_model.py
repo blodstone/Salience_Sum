@@ -11,7 +11,7 @@ from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 from allennlp.modules.seq2seq_decoders.seq_decoder import SeqDecoder
 from allennlp.nn import util, InitializerApplicator, RegularizerApplicator
 
-from salience_sum.model import NoisyPredictionModel
+from salience_sum_old.model import NoisyPredictionModel
 
 
 @Model.register("summ_salience_seq2seq")
