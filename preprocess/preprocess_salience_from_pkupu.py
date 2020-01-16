@@ -2,16 +2,15 @@ import argparse
 import os
 import pickle
 from collections import defaultdict
-from itertools import product
 
-import pandas as pd
 import spacy
-import tqdm
+import pandas as pd
 
-from noisy_salience_model import AKE, NER, pkusumsum, gold
+from noisy_salience_model import AKE
+from noisy_salience_model import NER
 
 nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'tagger', 'entity_linker'])
-
+i = 0
 
 def gen_doc_sum(document_path, summary_path, list_name):
     # document_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/restbody'
@@ -71,6 +70,7 @@ def process_results(results):
         df_scores[doc_idx] = df_score
     return df_scores
 
+
 def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
     # print("Process doc {}".format(doc_f))
@@ -108,10 +108,12 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
             result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
     new_docs = []
     for token, value in zip(tokens, result_labels):
-        new_docs.append('{}|%|{}'.format(token, value))
+        new_docs.append('{}u"￨"{}'.format(token, value))
+    print(f'{gold_f} and {doc_f}')
     return '{}\t{}\n'.format(' '.join(new_docs), gold)
 
-def main(args):
+
+def main():
     set_name = args.set
     docs_path = args.docs_pku
     golds_path = args.golds_pku
@@ -122,7 +124,6 @@ def main(args):
     for name in set_name:
         index[name] = pickle.load(open(os.path.join(args.index, '{}_final_idx'.format(name)), 'rb'))
     summ_groups = []
-    summaries = {}
     # The folder name has to match these names
     if args.submodular:
         summ_groups.append('submodular')
@@ -137,54 +138,14 @@ def main(args):
 
     for dataset in set_name:
         print('Processing Dataset {}'.format(dataset))
-        # # Retrieve each document set and sort them
-        # doc_path = os.path.join(docs_path, dataset)
-        # doc_files = [(name, int(name.split('.')[0])) for name in os.listdir(doc_path)]
-        # doc_files.sort(key=lambda x: x[1])
-        #
-        # # Retrieve each gold set and sort them also
-        # gold_path = os.path.join(golds_path, dataset)
-        # gold_files = [(name, int(name.split('.')[0])) for name in os.listdir(gold_path)]
-        # gold_files.sort(key=lambda x: x[1])
-        doc_summ_pair = tqdm.tqdm(list(gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))))
+        doc_summ_pair = gen_doc_sum(docs_path, golds_path, list(index[dataset].keys()))
         new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
         write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
         write_file.writelines(new_lines)
         write_file.close()
-    # src_folder = args.src
-    # if args.AKE:
-    #     window = args.window
-    #     results['AKE'] = AKE.run(max_words, window, src_folder)
-    # if args.NER:
-    #     results['NER'] = NER.run(max_words, src_folder)
-    #
-    # if args.submodular:
-    #     tgt_folder = args.centroid_tgt
-    #     results['centroid'] = pkusumsum.run(src_folder, tgt_folder)
-    # if args.submodular:
-    #     tgt_folder = args.textrank_tgt
-    #     results['textrank'] = pkusumsum.run(src_folder, tgt_folder)
-    # if args.gold:
-    #     highlight_path = args.highlight
-    #     doc_id_path = args.doc_id
-    #     gold_result = gold.run(src_folder, highlight_path, doc_id_path)
-    #
-    # df_scores = process_results(results)
-    # df_gold_scores = process_gold_result(gold_result)
-    # output_file = open('sample_data/df_scores.pickle', 'wb')
-    # pickle.dump(df_scores, output_file)
-    # output_file.close()
-    # output_file = open('sample_data/df_gold_scores.pickle', 'wb')
-    # pickle.dump(df_gold_scores, output_file)
-    # output_file.close()
 
 
 if __name__ == '__main__':
-    # doc_folder = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs'
-    # docs_name = ['train', 'val']
-    # summs_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs/'
-    # summs_group = [['submodular', 'textrank', 'centroid'], ['submodular_val', 'textrank_val', 'centroid_val']]
-    # output_path = '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_allen'
     # -set train val -docs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs -golds_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/gold -summs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs -output /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_allen --submodular --centroid --textrank
     parser = argparse.ArgumentParser()
     parser.add_argument('-set', nargs='+', help='Input list of set names (the folder name has to match the same name).')
@@ -217,4 +178,4 @@ if __name__ == '__main__':
     parser.add_argument('-doc_id', help='Path to doc_id.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
     args = parser.parse_args()
-    main(args)
+    main()
