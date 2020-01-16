@@ -68,3 +68,7 @@ cat data/bbc/val.tsv | awk 'NR%100==1' > data/dev_bbc/val.dev.tsv
 python preprocess/add_noisy_dummy.py
 ```
 
+# Salience CRF
+```bash
+allennlp train -s data/train_exp_04 --include-package salience_sum_crf
+```

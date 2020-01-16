@@ -20,10 +20,10 @@ def gen_lines(path):
             new_lines.append(' '.join(comb) + '\t' + tgt + '\n')
         return new_lines
 
-train_path = '../data/dev_bbc/train.dev.tsv'
-val_path = '../data/dev_bbc/val.dev.tsv'
-tagged_train_path = '../data/dev_bbc/train.dev.tsv.tagged'
-tagged_val_path = '../data/dev_bbc/val.dev.tsv.tagged'
+train_path = '../../data/dev_bbc/train.dev.tsv'
+val_path = '../../data/dev_bbc/val.dev.tsv'
+tagged_train_path = '../../data/dev_bbc/train.dev.tsv.tagged'
+tagged_val_path = '../../data/dev_bbc/val.dev.tsv.tagged'
 tagged_train_file = open(tagged_train_path, 'w')
 tagged_val_file = open(tagged_val_path, 'w')
 tagged_train_file.writelines(gen_lines(train_path))

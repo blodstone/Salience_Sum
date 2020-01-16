@@ -6,8 +6,8 @@ from collections import defaultdict
 import spacy
 import pandas as pd
 
-from noisy_salience_model import AKE
-from noisy_salience_model import NER
+from bbc.noisy_salience_model import AKE
+from bbc.noisy_salience_model import NER
 
 nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'tagger', 'entity_linker'])
 i = 0

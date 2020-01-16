@@ -20,7 +20,7 @@ def generate(input_path, output_path, type='doc'):
 
 
 if __name__ == '__main__':
-    file_path = '../data/bbc_allen'
+    file_path = '../../data/bbc_allen'
     i_paths = ['test.tsv']
     # i_paths = ['train.tsv']
     g_paths = [['submodular', 'textrank', 'centroid'], ['submodular_val', 'textrank_val', 'centroid_val']]
