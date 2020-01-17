@@ -4,8 +4,8 @@
 #$ -l h_rt=96:00:00
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb
-#$ -o /data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ/o.txt
-#$ -e /data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ/e.txt
+#$ -j y
+#$ -o crf_summ
 #$ -wd /home/acp16hh/Salience_Sum
 git checkout exp
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ
