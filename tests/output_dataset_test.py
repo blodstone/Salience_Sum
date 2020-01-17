@@ -6,6 +6,7 @@
 Checking the output of preprocess_salience_from_pkupu.py against the raw version.
 """
 import json
+import pickle
 
 import pytest
 from pathlib import Path
@@ -24,9 +25,18 @@ def file_path() -> Tuple[Dict[str, Path], Dict[str, Path]]:
         'document': Path('../data/bbc-tokenized-segmented-final/restbody'),
         'summary': Path('../data/bbc-tokenized-segmented-final/firstsentence')
     }
-    index = json.load(open('/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc_raw/XSum-TRAINING-DEV-TEST-SPLIT-90-5-5.json'))
-    return files, raw, index
+    return files, raw
 
+@pytest.fixture
+def index():
+    json_index = json.load(open(
+        '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc_raw/XSum-TRAINING-DEV-TEST-SPLIT-90-5-5.json'))
+    indexes = {
+        'test': pickle.load(open('/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc_raw/index/test_final_idx', 'rb')),
+        'train': pickle.load(open('/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc_raw/index/train_final_idx', 'rb')),
+        'validation': pickle.load(open('/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc_raw/index/val_final_idx', 'rb')),
+    }
+    return json_index, indexes
 
 def count_word_tsv(line):
     lines = line.split('\n')
@@ -45,7 +55,7 @@ def count_word_simple(line):
 
 
 def test_word_count(file_path: Tuple[Dict[str, Path], Dict[str, Path]]):
-    files, raw, _ = file_path
+    files, raw = file_path
     assert files['train'].is_file()
     assert files['test'].is_file()
     assert files['val'].is_file()
@@ -59,12 +69,16 @@ def test_word_count(file_path: Tuple[Dict[str, Path], Dict[str, Path]]):
     total_raw_len = sum([count_word_simple(summ.read_text()) for summ in raw['summary'].iterdir()])
     assert total_output_len == total_raw_len, f'{total_output_len} != {total_raw_len}'
 
-def test_file_order(file_path: Tuple[Dict[str, Path], Dict[str, Path]]):
-    files, raw, index = file_path
-    train = files['train'].read_text()
-    test = files['test'].read_text()
-    val = files['val'].read_text()
-    x = sorted([line.split('\t')[1] for line in test.split('\n') + train.split('\n') + val.split('\n') if line.strip() != ''])
-    y = sorted([summ.read_text().strip().lower() for summ in raw['summary'].iterdir()])
-    assert x[0] == y[0]
-    assert len(x) == len(index['train']) + len(index['validation']) + len(index['test'])
+# def test_file_order(file_path: Tuple[Dict[str, Path], Dict[str, Path]]):
+#     files, raw, index = file_path
+#     train = files['train'].read_text()
+#     test = files['test'].read_text()
+#     val = files['val'].read_text()
+#     x = sorted([line.split('\t')[1] for line in test.split('\n') + train.split('\n') + val.split('\n') if line.strip() != ''])
+#     y = sorted([summ.read_text().strip().lower() for summ in raw['summary'].iterdir()])
+#     assert x[0] == y[0]
+#     assert len(x) == len(index['train']) + len(index['validation']) + len(index['test'])
+
+def test_index(index):
+    json_index, indexes = index
+    print()
