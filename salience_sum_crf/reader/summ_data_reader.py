@@ -27,7 +27,7 @@ class SummDataReader(DatasetReader):
         with open(file_path) as file:
             for line in file:
                 src_tagged_seq, tgt_seq = line.split('\t')
-                src_seq, salience_seq = zip(*[group.split('|%|') for group in src_tagged_seq.split()])
+                src_seq, salience_seq = zip(*[group.split(u"￨") for group in src_tagged_seq.split()])
                 assert len(src_seq) == len(salience_seq)
                 yield self.text_to_instance(
                     [Token(token) for token in src_seq],
@@ -40,7 +40,7 @@ class SummDataReader(DatasetReader):
             cs = CubicSpline(list(value_dict.keys()), list(value_dict.values()))
         except:
             return value
-        c = [float(cs(i)) if i in value_dict.keys() else cs(i) * cs(i) for i in range(len(value))]
+        c = [int(cs(i)) if i in value_dict.keys() else cs(i) * cs(i) for i in range(len(value))]
         return c
 
     def text_to_instance(self, src_seq: List[Token], tgt_seq: str, salience_seq: List[str]) -> Instance:
