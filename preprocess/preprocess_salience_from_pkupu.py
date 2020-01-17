@@ -75,6 +75,7 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     doc, doc_f, gold, gold_f = summ_pair
     # Every token start with zero salience
     result_labels = [0 for sent in doc for _ in sent.split()]
+    gold = [word.strip().lower() for word in gold[0].split()]
     tokens = [word.strip().lower() for sent in doc for word in sent.split()]
     # Then iterate each summary group to add salience points
     for summ_group in summ_groups:
