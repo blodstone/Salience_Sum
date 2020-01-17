@@ -11,23 +11,23 @@
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged",
-  "validation_data_path": "data/bbc_allen/validation.tsv.tagged",
+  "train_data_path": "/data/acp16hh/data/bbc_allen/bbc_tagged_summ/train.tsv.tagged",
+  "validation_data_path": "/data/acp16hh/data/bbc_allen/bbc_tagged_summ/val.tsv.tagged",
   "model": {
     "type": "crf_tagger",
     "text_field_embedder": {
       "token_embedders": {
         "tokens": {
           "type": "embedding",
-          "embedding_dim": 128
+          "embedding_dim": 256
         }
       }
     },
     "encoder": {
-      "type": "gru",
-      "input_size": 128,
-      "hidden_size": 256,
-      "num_layers": 1,
+      "type": "lstm",
+      "input_size": 256,
+      "hidden_size": 512,
+      "num_layers": 2,
       "dropout": 0.0,
       "bidirectional": true
     },
