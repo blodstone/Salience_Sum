@@ -7,10 +7,10 @@
 #$ -o /data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ/o.txt
 #$ -e /data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ/e.txt
 #$ -wd /home/acp16hh/Salience_Sum
-git checkout master
+git checkout exp
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ
 module load apps/python/conda
 module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
 source activate gwen
 
-allennlp train -s $MODEL -f --include_package salience_sum_crf HPC/crf/crf_summ.jsonnet
+allennlp train -s $MODEL -f --file-friendly-logging --include-package salience_sum_crf HPC/crf/crf_summ.jsonnet
