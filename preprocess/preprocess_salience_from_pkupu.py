@@ -107,7 +107,7 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     for token, value in zip(tokens, result_labels):
         new_docs.append('{}u"￨"{}'.format(token, value))
     print(f'{gold_f} and {doc_f}')
-    return '{}\t{}\n'.format(' '.join(new_docs), gold[0])
+    return '{}\t{}\n'.format(' '.join(new_docs), ' '.join(gold))
 
 
 def main():
