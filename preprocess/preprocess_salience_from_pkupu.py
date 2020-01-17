@@ -29,10 +29,17 @@ def gen_doc_sum(document_path, summary_path, set_name):
 def find_overlap(summ: List[str], doc: List[str]) -> Tuple[int, int]:
     l_summ = len(summ)
     first_summ_token = [i for i, token in enumerate(doc) if token == summ[0]]
+    nlp_summ = nlp(' '.join(summ))
     for i in first_summ_token:
         t_doc = ' '.join(doc[i:i+l_summ])
-        if similar(t_doc, ' '.join(summ)) > 0.9:
-            return i, i+l_summ-1
+        if similar(t_doc, ' '.join(summ)) > 0.7:
+            j = len(nlp_summ) - 1
+            k = i
+            while j > 0:
+                if doc[k] == nlp_summ[len(nlp_summ) - j - 1].text:
+                    k = k + 1
+                j = j - 1
+            return i, k
     return 0, 0
 
 
@@ -45,8 +52,10 @@ def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
     for summ_group in summ_groups:
         if summ_group in ['submodular', 'textrank', 'centroid']:
             summ_content = open(os.path.join(summs_path, dataset, summ_group, doc_f.name)).readlines()
-            start_idx, end_idx = find_overlap(summ_content[0].split(), doc.split())
-            result_labels = [val+1 if start_idx <= i <= end_idx else val for i, val in enumerate(result_labels)]
+            if len(summ_content) > 0:
+                start_idx, end_idx = find_overlap(summ_content[0].split(), doc.split())
+                assert start_idx + end_idx != 0
+                result_labels = [val+1 if start_idx <= i <= end_idx else val for i, val in enumerate(result_labels)]
         elif summ_group == 'AKE':
             window = args.window
             results = AKE.run(max_words, window, doc)
