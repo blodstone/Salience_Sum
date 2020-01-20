@@ -2,37 +2,18 @@
 Named Entity Recognition
 '''
 from collections import Counter
+from typing import List, Any
+
+from noisy_salience_model.salience_model import Salience, SalienceSet, Instance
 
 
-def run(max_words, doc, nlp):
-    nlp_doc = list(nlp.pipe(doc))
-    result_label = []
-    for i, adoc in enumerate(nlp_doc):
-        label = [0]
-        for ent in adoc.ents:
-            if ent.start_char == 0:
-                label = [1]
-                break
-        for j, c in enumerate(doc[i]):
-            if c == ' ' or c == u'\xa0':
-                alabel = 0
-                for ent in adoc.ents:
-                    if ent.start_char <= j+1 <= ent.end_char:
-                        alabel = 1
-                        break
-                label.append(alabel)
-        assert len(label) == len(doc[i].split())
-        result_label.extend(label)
-    # ent_counter = Counter([ent.lower_ for doc in nlp_doc for ent in doc.ents]).most_common(n=max_words)
-    # ents = [ent[0] for ent in ent_counter]
-    # result_label = []
-    # for sent in doc:
-    #     for word in sent.split():
-    #         if word in ents:
-    #             result_label.append(1)
-    #         else:
-    #             result_label.append(0)
-    return result_label
+def process(salience_instance: Instance, nlp: Any) -> Salience:
+    salience = SalienceSet.init_salience_set(salience_instance.doc_size)
+    for i, line in enumerate(salience_instance.raw):
+        nlp_doc = nlp(' '.join(line))
+        for j, token in enumerate(nlp_doc):
+            salience[i][j] = 0 if token.ent_type_ == '' else 1
+    return salience
 
 if __name__ == '__main__':
     pass

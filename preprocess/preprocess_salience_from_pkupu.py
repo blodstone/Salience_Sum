@@ -1,84 +1,88 @@
 import argparse
 import json
-import os
 from pathlib import Path
+from typing import Tuple
 
 import spacy
-from suffixtree import *
-from typing import List, Tuple
+from spacy.tokens import Doc
 
-from noisy_salience_model import AKE
-from noisy_salience_model import NER
-from difflib import SequenceMatcher
-
-nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'tagger', 'entity_linker'])
+from noisy_salience_model import AKE, NER, tfidf, summ
+from noisy_salience_model.salience_model import Dataset, Instance, SalienceSet
 
 
-def similar(a, b):
-    return SequenceMatcher(None, a, b).ratio()
+class WhitespaceTokenizer(object):
+    def __init__(self, vocab):
+        self.vocab = vocab
+
+    def __call__(self, text):
+        words = text.split(' ')
+        # All tokens 'own' a subsequent space character in this tokenizer
+        spaces = [True] * len(words)
+        return Doc(self.vocab, words=words, spaces=spaces)
 
 
-def gen_doc_sum(document_path, summary_path, set_name):
-    document_path = Path(document_path, set_name)
-    summary_path = Path(summary_path, set_name)
+nlp = spacy.load("en_core_web_sm", disable=["textcat", 'parser', 'entity_linker', 'tagger'])
+nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
+
+
+def gen_salience_instance(document_path: Path, summary_path: Path, set_name: str, index: dict) -> Tuple[str, Instance]:
     for doc_f in document_path.iterdir():
-        summ_f = summary_path / doc_f.name
-        yield doc_f.read_text().strip(), doc_f, summ_f.read_text().strip(), summ_f
+        doc_id = doc_f.stem
+        if doc_id not in index[set_name]:
+            continue
+        summ_f = summary_path / f'{doc_id}.fs'
+        doc_content = [[word.lower() for word in line.strip().split()] for line in doc_f.open().readlines()]
+        raw_content = [[word for word in line.strip().split()] for line in doc_f.open().readlines()]
+        summ_content = [[word.lower() for word in line.strip().split()] for line in summ_f.open().readlines()]
+        salience = Instance(doc_content, raw_content, summ_content)
+        yield doc_id, salience
 
 
-def find_overlap(summ: List[str], doc: List[str]) -> Tuple[int, int]:
-    l_summ = len(summ)
-    first_summ_token = [i for i, token in enumerate(doc) if token == summ[0]]
-    nlp_summ = nlp(' '.join(summ))
-    for i in first_summ_token:
-        t_doc = ' '.join(doc[i:i+l_summ])
-        if similar(t_doc, ' '.join(summ)) > 0.7:
-            j = len(nlp_summ) - 1
-            k = i
-            while j > 0:
-                if doc[k] == nlp_summ[len(nlp_summ) - j - 1].text:
-                    k = k + 1
-                j = j - 1
-            return i, k
-    return 0, 0
-
-
-def run(summ_pair, summ_groups, summs_path, dataset, index, max_words):
-    doc, doc_f, gold, gold_f = summ_pair
-    # Every token start with zero salience
-    result_labels = [0 for _ in doc.split()]
-    tokens = [word.strip().lower() for word in doc.split()]
-    # Then iterate each summary group to add salience points
-    for summ_group in summ_groups:
-        if summ_group in ['submodular', 'textrank', 'centroid']:
-            summ_content = open(os.path.join(summs_path, dataset, summ_group, doc_f.name)).readlines()
-            if len(summ_content) > 0:
-                start_idx, end_idx = find_overlap(summ_content[0].split(), doc.split())
-                assert start_idx + end_idx != 0
-                result_labels = [val+1 if start_idx <= i <= end_idx else val for i, val in enumerate(result_labels)]
-        elif summ_group == 'AKE':
-            window = args.window
-            results = AKE.run(max_words, window, doc)
-            assert len(result_labels) == len(results)
-            result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
-        elif summ_group == 'NER':
-            results = NER.run(max_words, doc, nlp)
-            assert len(result_labels) == len(results)
-            result_labels = [result_labels[i] + results[i] for i, v in enumerate(results)]
-    new_docs = []
-    for token, value in zip(tokens, result_labels):
-        new_docs.append(u'{}￨{}'.format(token, value))
-    print(f'{gold_f.name} and {doc_f.name}')
-    return '{}\t{}\n'.format(' '.join(new_docs), gold)
+def process(dataset, max_words):
+    for doc_id, instance in dataset.dataset.items():
+        salience_set = instance.salience_set
+        new_salience = SalienceSet.init_salience_set(instance.doc_size)
+        total_aggregates = []
+        for name, salience in salience_set.salience_set.items():
+            if name in ['tfidf', 'NER']:
+                continue
+            salience_sets = [5*salience]
+            ner_idx = -1
+            tfidf_idx = -1
+            if 'NER' in salience_set.salience_set.keys():
+                salience_sets.append(salience_set['NER'])
+                ner_idx = len(salience_sets) - 1
+            if 'tfidf' in salience_set.salience_set.keys():
+                salience_sets.append(salience_set['tfidf'])
+                tfidf_idx = len(salience_sets) - 1
+            saliences = list(zip(*salience_sets))
+            aggregates = []
+            for i, salience_values in enumerate(saliences):
+                for j, token in enumerate(zip(*salience_values)):
+                    aggregate = token[0]
+                    if ner_idx != -1:
+                        aggregate += token[ner_idx]
+                    if tfidf_idx != -1:
+                        aggregate *= token[tfidf_idx]
+                    aggregates.append((aggregate, i, j))
+            aggregates = sorted(aggregates, key=lambda x: x[0], reverse=True)[:max_words]
+            total_aggregates.append(aggregates)
+        for aggregates in total_aggregates:
+            for aggregate in aggregates:
+                _, i, j = aggregate
+                new_salience[i][j] += 1
+        instance.salience_set['filter_aggregate'] = new_salience
+    return dataset
 
 
 def main():
-    set_name = args.set
-    docs_path = args.docs_pku
-    golds_path = args.golds_pku
-    output_path = args.output
-    summs_path = args.summs_pku
+    set_names = args.set
+    docs_path = Path(args.docs_pku)
+    golds_path = Path(args.golds_pku)
+    output_path = Path(args.output)
+    summs_path = Path(args.summs_pku)
     max_words = args.max_words
+    modes = args.modes
     index = json.load(open(args.index))
     summ_groups = []
     # The folder name has to match these names
@@ -88,22 +92,46 @@ def main():
         summ_groups.append('textrank')
     if args.centroid:
         summ_groups.append('centroid')
+    if args.lexpagerank:
+        summ_groups.append('lexpagerank')
     if args.AKE:
         summ_groups.append('AKE')
     if args.NER:
         summ_groups.append('NER')
-
-    for dataset in set_name:
-        print('Processing Dataset {}'.format(dataset))
-        doc_summ_pair = gen_doc_sum(docs_path, golds_path, dataset)
-        new_lines = [run(summ_pair, summ_groups, summs_path, dataset, index, max_words) for summ_pair in doc_summ_pair]
-        write_file = open(os.path.join(output_path, dataset + '.tsv.tagged'), 'w')
-        write_file.writelines(new_lines)
-        write_file.close()
+    for dataset_name in set_names:
+        dataset = Dataset(dataset_name)
+        for doc_id, salience_instance in gen_salience_instance(
+                docs_path, golds_path, dataset_name, index):
+            salience = None
+            for summ_group in summ_groups:
+                if summ_group in ['submodular', 'textrank', 'centroid', 'lexpagerank']:
+                    summ_path = summs_path / summ_group / f'{doc_id}.restbody'
+                    if summ_path.exists():
+                        salience = summ.process(salience_instance, summ_path)
+                    else:
+                        break
+                if summ_group == 'AKE':
+                    salience = AKE.process(salience_instance, args.window)
+                if summ_group == 'NER':
+                    salience = NER.process(salience_instance, nlp)
+                if salience:
+                    salience_instance.salience_set[summ_group] = salience
+            if salience is None:
+                continue
+            print(f'Processed ({len(dataset)}): {doc_id}')
+            dataset[doc_id] = salience_instance
+            if args.train_size is not None:
+                if dataset_name == 'train' and len(dataset) >= args.train_size:
+                    break
+        if args.tfidf:
+            dataset = tfidf.process(dataset)
+        if 'filter' in modes:
+            dataset = process(dataset, max_words)
+        dataset.write_to_file(output_path, args.output_format, args.extra_name)
 
 
 if __name__ == '__main__':
-    # -set train val -docs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs -golds_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/gold -summs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs -output /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_allen --submodular --centroid --textrank
+    # -set train val test -docs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/docs -golds_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/firstsentence -summs_pku /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/PKUSUMSUM/summs_small -output /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_allen --submodular --centroid --textrank --lexpagerank --tfidf -index /home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc-tokenized-segmented-final/XSum-TRAINING-DEV-TEST-SPLIT-90-5-5.json -train_size 5
     parser = argparse.ArgumentParser()
     parser.add_argument('-set', nargs='+', help='Input list of set names (the folder name has to match the same name).')
     parser.add_argument('-index', help='Index for matching files.')
@@ -112,27 +140,22 @@ if __name__ == '__main__':
     # We have a fixed set of summ folder name: submodular, centroid and textrank
     parser.add_argument('-summs_pku', help='Folder consisting of generated pkusumsum output for each set.')
     parser.add_argument('-output', help='Folder for generating the output.')
-    # parser.add_argument('-src', help='Source document (pickle format).')
-    parser.add_argument('--submodular', help='Submodular.',
-                        action='store_true')
-    parser.add_argument('-submodular_tgt', help='Preprocessed submodular summ in advance.')
-    parser.add_argument('--centroid', help='Centroid.',
-                        action='store_true')
-    parser.add_argument('-centroid_tgt', help='Preprocessed centroid summ in advance.')
-    parser.add_argument('--textrank', help='Textrank.',
-                        action='store_true')
-    parser.add_argument('-textrank_tgt', help='Preprocessed textrank summ in advance.')
-    parser.add_argument('--compression', help='Compression.',
-                        action='store_true')
+    parser.add_argument('-train_size', help='Specify max train_size', default=None, type=int)
+    parser.add_argument('--submodular', help='Submodular.', action='store_true')
+    parser.add_argument('--centroid', help='Centroid.', action='store_true')
+    parser.add_argument('--textrank', help='Textrank.', action='store_true')
+    parser.add_argument('--lexpagerank', help='Lexpagerank.', action='store_true')
+    parser.add_argument('--tfidf', help='TFIDF', action='store_true')
     parser.add_argument('--AKE', help='Automated Keyword Extraction (AKE) using textrank.',
                         action='store_true')
     parser.add_argument('-window', help='Window for Textrank, needed by AKE.',
                         default=5, type=int)
-    parser.add_argument('--NER', help='Named Entity Recognition.',
-                        action='store_true')
+    parser.add_argument('--NER', help='Named Entity Recognition.', action='store_true')
     parser.add_argument('--gold', help='Gold annotations.', action='store_true')
     parser.add_argument('-highlight', help='Path to pandas highlight.')
-    parser.add_argument('-doc_id', help='Path to doc_id.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
+    parser.add_argument('-output_format', help='Allennlp or Opennmt output format.', default='opennmt')
+    parser.add_argument('-extra_name', help='Additional name for the output file path.', default='')
+    parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups', default=['all'])
     args = parser.parse_args()
     main()

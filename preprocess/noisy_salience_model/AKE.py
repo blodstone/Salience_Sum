@@ -1,45 +1,44 @@
 '''
 Automated Keyword Retrieval using Textrank
 '''
+from typing import List
+
+import networkx as nx
 import nltk
 from collections import namedtuple
 
 import spacy
-import networkx as nx
 
+from noisy_salience_model.salience_model import Instance, Salience, SalienceSet, Text
 
 Labeled_Word = namedtuple('Labeled_Word', ['word', 'label', 'idx', 'sent_idx', 'score'])
 desired_pos = ['JJ', 'JJR', 'NN', 'NNS', 'NNP', 'NNPS', ]
 
 
-def create_labeled_doc(doc) -> list:
+def create_labeled_doc(doc: Text) -> list:
     '''
     Creates initial labeled documents and numbers the index only for the
     desired tags
     :param doc: Document splitted from spacy
     :return: Labeled document
     '''
-    result = []
-    idx = sent_idx = 0
-    for sent in doc:
-        sent_idx += 1
-        set_tagged = nltk.pos_tag(sent.split())
-        for pair in set_tagged:
+    labeled_doc = []
+    for sent_idx, sent in enumerate(doc):
+        set_tagged = nltk.pos_tag(sent)
+        for idx, pair in enumerate(set_tagged):
             word, pos = pair
             if pos in desired_pos:
-                result.append(Labeled_Word(word.lower(), 1, idx, sent_idx, 0))
+                labeled_doc.append(Labeled_Word(word.lower(), 1, idx, sent_idx, 0))
             else:
-                result.append(Labeled_Word(word.lower(), 0, idx, sent_idx, 0))
-            idx += 1
-    return result
+                labeled_doc.append(Labeled_Word(word.lower(), 0, idx, sent_idx, 0))
+    return labeled_doc
 
 
-def run(max_words, window, doc):
+def process(salience_instance: Instance, window: int) -> Salience:
     # Split and create initial label
-    labeled_doc = create_labeled_doc(doc)
+    labeled_doc = create_labeled_doc(salience_instance.doc)
     # Build graph
     graph = nx.Graph()
-    i = 0
     # Add pair to graph from labeled doc that has no -1 index
     for i, labeled_word in enumerate(labeled_doc[:len(labeled_doc)]):
         if labeled_word.label == 0:
@@ -63,15 +62,12 @@ def run(max_words, window, doc):
     # g.show('graph.html')
     # Retrieve top N keywords
     ranks = nx.pagerank(graph)
-    top_n_ranks = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True)[:max_words])
+    top_n_ranks = dict(sorted(ranks.items(), key=lambda x: x[1], reverse=True)[:100])
+    salience = SalienceSet.init_salience_set(salience_instance.doc_size)
     # Score keywords
     for i, _ in enumerate(labeled_doc):
         if labeled_doc[i].word in top_n_ranks.keys():
-            labeled_doc[i] = Labeled_Word(labeled_doc[i].word, 1,
-                                          labeled_doc[i].idx, labeled_doc[i].sent_idx,
-                                          ranks[labeled_doc[i].word])
+            salience[labeled_doc[i].sent_idx][labeled_doc[i].idx] = 1
         else:
-            labeled_doc[i] = Labeled_Word(labeled_doc[i].word, 0,
-                                          labeled_doc[i].idx, labeled_doc[i].sent_idx,
-                                          -1)
-    return [labeled_word.label for labeled_word in labeled_doc]
+            salience[labeled_doc[i].sent_idx][labeled_doc[i].idx] = 0
+    return salience
