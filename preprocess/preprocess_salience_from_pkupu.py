@@ -127,7 +127,7 @@ def main():
             dataset = tfidf.process(dataset)
         if 'filter' in modes:
             dataset = process(dataset, max_words)
-        dataset.write_to_file(output_path, args.output_format, args.extra_name)
+        dataset.write_to_file(output_path, args.extra_name)
 
 
 if __name__ == '__main__':
@@ -154,7 +154,6 @@ if __name__ == '__main__':
     parser.add_argument('--gold', help='Gold annotations.', action='store_true')
     parser.add_argument('-highlight', help='Path to pandas highlight.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
-    parser.add_argument('-output_format', help='Allennlp or Opennmt output format.', default='opennmt')
     parser.add_argument('-extra_name', help='Additional name for the output file path.', default='')
     parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups', default=['all'])
     args = parser.parse_args()
