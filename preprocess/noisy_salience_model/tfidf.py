@@ -21,6 +21,7 @@ def process(dataset: Dataset) -> Dataset:
         salience = SalienceSet.init_salience_set(instance.doc_size)
         for i, line in enumerate(instance.doc):
             for j, word in enumerate(line):
-                salience[i][j] = idf[word] * math.log(tf_count[doc_id][word], 2)
+                salience[i][j] = idf[word] * math.log(tf_count[doc_id][word] + 1, 2)
+                assert salience[i][j] != 0.0
         dataset[doc_id].salience_set['tfidf'] = salience
     return dataset
