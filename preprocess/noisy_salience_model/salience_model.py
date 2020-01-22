@@ -89,9 +89,11 @@ class Dataset(MutableMapping[str, Instance]):
     def __iter__(self):
         return iter(self.dataset)
 
-    def write_to_file(self, output_path: Path, output_format: str, extra_name: str = ''):
+    def write_to_file(self, output_path: Path, extra_name: str = 'tagged'):
         output_docs = []
         output_summs = []
+        output_tsvs = []
+        summ_groups = None
         for _, instance in self.dataset.items():
             summ_groups = []
             salience_sets = []
@@ -104,20 +106,17 @@ class Dataset(MutableMapping[str, Instance]):
                 for token in zip(line, *salience_values):
                     output_token = u'￨'.join([str(t) for t in token])
                     output_line.append(output_token)
-            if output_format == 'allennlp':
-                output_docs.append(' '.join(output_line) + '\t' + ' '.join(instance.summ))
-            else:
-                output_docs.append(' '.join(output_line))
+            output_tsvs.append(' '.join(output_line) + '\t' + ' '.join(instance.summ))
+            output_docs.append(' '.join(output_line))
             output_summs.append(' '.join([' '.join(tokens) for tokens in instance.summ]))
         output_docs = '\n'.join(output_docs)
+        output_tsvs = '\n'.join(output_tsvs)
         output_summs = '\n'.join(output_summs)
-        if output_format == 'allennlp':
-            tsv_file = output_path / f'{self.dataset_name}{extra_name}.tsv'
-            tsv_file.write_text(output_docs)
-        else:
-            src_file = output_path / f'{self.dataset_name}{extra_name}.src.txt'
-            src_file.write_text(output_docs)
-            tgt_file = output_path / f'{self.dataset_name}{extra_name}.tgt.txt'
-            tgt_file.write_text(output_summs)
+        tsv_file = output_path / f'{self.dataset_name}.{extra_name}.tsv'
+        tsv_file.write_text(output_tsvs)
+        src_file = output_path / f'{self.dataset_name}.{extra_name}.src.txt'
+        src_file.write_text(output_docs)
+        tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
+        tgt_file.write_text(output_summs)
         info_file = output_path / 'summ_groups.txt'
         info_file.write_text(u'￨'.join(summ_groups))
