@@ -85,42 +85,6 @@ class EncoderDecoder(Model):
         state['hidden_context'] = state['dec_state'].new_zeros(state['dec_state'].size())
         return state
 
-    def forward(self,
-                source_tokens: Dict[str, torch.Tensor],
-                source_text: Dict[str, Any],
-                target_text: Dict[str, Any],
-                source_ids: Dict[str, torch.Tensor],
-                target_tokens: Dict[str, torch.Tensor] = None,
-                target_ids: torch.Tensor = None,
-                salience_values: torch.Tensor = None) \
-            -> Dict[str, torch.Tensor]:
-        """
-        The forward function of the encoder and decoder model
-
-        :param source_ids: The source ids that is unique to the document
-        :param source_text: The raw text of source sequence
-        :param salience_values: The saliency values for source tokens
-        :param source_tokens: Indexes of states tokens
-        :param target_tokens: Indexes of target tokens
-        :param target_ids: Similar with target_tokens but mapped with extended vocabulary
-        :return: The loss and prediction of the model
-        """
-        state = self._encode(source_tokens)
-        if self.salience_lambda != 0.0:
-            predicted_salience = self._predict_salience(state)
-        else:
-            predicted_salience = None
-        output_dict = {}
-
-        if target_tokens:
-            state = self._decode(source_ids, target_tokens, state)
-            output_dict['loss'] = self._compute_loss(target_tokens, target_ids,
-                                                     salience_values, predicted_salience, state)
-
-        if not self.training and not target_tokens:
-            output_dict['results'] = self._forward_beam_search(state, source_ids)
-        return output_dict
-
     def _forward_beam_search(self,
                              state: Dict[str, torch.Tensor],
                              source_ids: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -184,6 +148,42 @@ class EncoderDecoder(Model):
         state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
         return state['class_probs'].squeeze(1).log(), state
 
+    def forward(self,
+                source_tokens: Dict[str, torch.Tensor],
+                source_text: Dict[str, Any],
+                source_ids: Dict[str, torch.Tensor],
+                target_text: Dict[str, Any] = None,
+                target_tokens: Dict[str, torch.Tensor] = None,
+                target_ids: torch.Tensor = None,
+                salience_values: torch.Tensor = None) \
+            -> Dict[str, torch.Tensor]:
+        """
+        The forward function of the encoder and decoder model
+
+        :param source_ids: The source ids that is unique to the document
+        :param source_text: The raw text of source sequence
+        :param salience_values: The saliency values for source tokens
+        :param source_tokens: Indexes of states tokens
+        :param target_tokens: Indexes of target tokens
+        :param target_ids: Similar with target_tokens but mapped with extended vocabulary
+        :return: The loss and prediction of the model
+        """
+        state = self._encode(source_tokens)
+        if self.salience_lambda != 0.0:
+            predicted_salience = self._predict_salience(state)
+        else:
+            predicted_salience = None
+        output_dict = {}
+
+        if target_tokens:
+            state = self._decode(source_ids, target_tokens, state)
+            output_dict['loss'] = self._compute_loss(target_tokens, target_ids,
+                                                     salience_values, predicted_salience, state)
+
+        if not self.training and not target_tokens:
+            output_dict['results'] = self._forward_beam_search(state, source_ids)
+        return output_dict
+
     def _predict_salience(self, state: Dict[str, torch.Tensor]) -> torch.Tensor:
         predicted_salience = self.salience_predictor(state)
         return predicted_salience
@@ -202,9 +202,10 @@ class EncoderDecoder(Model):
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \
             self.encoder(embedded_src, state['source_lengths'])
+        batch_size = states.size(0)
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
-        state['hidden'] = final_state  # (B, L, Num Direction * D_h)
-        state['context'] = final_context_state  # (B, L, Num Direction * D_h)
+        state['hidden'] = final_state.view(batch_size, final_state.size(0), final_state.size(2))  # (B, L, Num Direction * D_h)
+        state['context'] = final_context_state.view(batch_size, final_context_state.size(0), final_context_state.size(2))  # (B, L, Num Direction * D_h)
         state['states_features'] = states_features  # (B, L, Num Direction * D_h)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state

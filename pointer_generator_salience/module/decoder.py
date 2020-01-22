@@ -70,7 +70,9 @@ class Decoder(Module, Registrable):
         batch_size = input_emb.size(0)
         attention = None
         x = self.input_context(torch.cat((input_emb, input_feed), dim=2))
-        rnn_output, final = self.rnn(x, (hidden, context))
+        rnn_output, final = self.rnn(x,
+                                     (hidden.view(1, batch_size, hidden.size(2)),
+                                      context.view(1, batch_size, hidden.size(2))))
         if self.is_attention:
             # Attention step 0 to calculate coverage step 1
             decoder_output, coverage, attention = self.attention(
@@ -87,8 +89,8 @@ class Decoder(Module, Registrable):
         state['coverage'] = coverage
         state['attention'] = attention
         state['input_feed'] = input_feed
-        state['hidden'] = final[0].view(1, batch_size, self.hidden_size)
-        state['context'] = final[1].view(1, batch_size, self.hidden_size)
+        state['hidden'] = final[0].view(batch_size, 1, self.hidden_size)
+        state['context'] = final[1].view(batch_size, 1, self.hidden_size)
         return state
 
     def _build_class_logits(self,

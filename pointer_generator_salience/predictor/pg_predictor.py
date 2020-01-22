@@ -1,14 +1,9 @@
-from pathlib import Path
-
 import numpy
 import torch
-from allennlp.common import JsonDict, Registrable
-from allennlp.data import Instance, DatasetReader, Vocabulary
+from allennlp.data import Vocabulary
 from allennlp.data.iterators import BucketIterator
 from allennlp.models import Model
 from allennlp.nn import util
-from allennlp.predictors import Predictor
-from overrides import overrides
 from tqdm import tqdm
 
 from pointer_generator_salience.reader.summ_reader import SummDataReader
