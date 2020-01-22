@@ -10,7 +10,7 @@ def main():
     raw_docs = Path(args.raw_docs)
     raw_summs = Path(args.raw_summs)
     index = json.load(open(args.index))
-    reverse_index = {doc_id: dataset for dataset, doc_id in index.item()}
+    reverse_index = {doc_id: dataset for dataset, doc_id in index.items()}
     output_path = Path(args.output_path)
 
     output_text = {
@@ -28,8 +28,6 @@ def main():
             tsv = f'{text}\t{summary_text}'
             dataset = reverse_index[doc_id]
             output_text[dataset].append(tsv)
-        if i > 5:
-            break
 
     for dataset, text_list in output_text.items():
         (output_path / f'{dataset}.tsv').write_text('\n'.join(text_list))
