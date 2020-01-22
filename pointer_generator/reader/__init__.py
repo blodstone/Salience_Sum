@@ -1,1 +1,0 @@
-from pointer_generator.reader.summ_reader import SummDataReader

@@ -1,0 +1,257 @@
+\documentclass{article}
+\usepackage{natbib}
+\usepackage{arxiv}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{listings}
+\title{Gwen Project}
+\begin{document}
+\section{Project Specification}
+  This project is intended to explore the many variety of Seq2Seq architecture.
+  All the projects are build using AllenNLP framework.
+\section{Data}
+  BBC Dataset
+\section{Pointer Generator Salience}
+  This is our implementation of pointer generator that is repurposed for salience prediction.
+
+\section{Pointer Generator}
+  This sub-project re-implement the paper of See, 2017.
+  \subsection{Notes}
+  \begin{enumerate}
+    \item All index start from 1, the index of 0 is reserved for initialization.
+  \end{enumerate}
+  \subsection{Input}
+  \subsubsection{Spec}
+  Source sentence, $x_i \in \mathbb{R}^v$,
+  \[
+    X = [x_1, \cdots, x_{T_s}]
+  \] and target sentence, $y_j \in \mathbb{R}^v$,
+  \[
+    Y = [y_1, \cdots, y_{T_t}]
+  \]
+  where:
+  \begin{enumerate}
+    \item $T_s$ and $T_t$ are 400 and 100.
+    \item $y_{T_t}$, are BOS and EOS tokens.
+  \end{enumerate}
+  \subsubsection{Review}
+  \begin{enumerate}
+    \item \texttt{data.py}
+    \begin{enumerate}
+      \item \texttt{article2ids}: Convert words in article into indexes, in addition extend the vocabulary by the article' tokens that are not in vocabulary. Return ids (the article indexes) and oovs (extra word list that is not in vocabulary). Note oovs can be used to retrieve the token from the extended vocab index.
+      \item \texttt{abstract2ids}: Convert words in abstract into indexes with little caveat: the oov that exist in the article extended vocab is used instead of the unknown token.
+      \item \texttt{outputids2words}: Retrieving token based on index with mapping support for the extended vocabulary
+    \end{enumerate}
+  \end{enumerate}
+  \subsection{Encoder}
+  \subsubsection{Spec}
+  The inputs are passed to LSTM to produce $\mathbf{h}_i$ and $\mathbf{c}_{i-1}$ which is an encoder hidden and context state at time-step $i$
+  \[
+    \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(e_s(x_i) \in \mathbb{R}^i, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
+  \]
+  Since it is a bidirectional LSTM, the hidden is as such.
+  \[
+    \mathbf{h}_i = [\overleftarrow{\mathbf{h}_i}, \overrightarrow{\mathbf{h}_i}]
+  \]
+  \[
+    \overleftarrow{\mathbf{h}_i}, \overrightarrow{\mathbf{h}_i} \in \mathbb{R}^h,
+  \]
+  The final state and context are reduced to half their dimension.
+  \[
+    \mathbf{h}'_{T_s} = \text{ReLU}(\mathbf{h}_{T_s} (\mathbf{W}^{H\times 2H})^\intercal)
+  \]
+  \[
+    \mathbf{c}'_{T_s} = \text{ReLU}(\mathbf{c}_{T_s} (\mathbf{W}^{H\times 2H})^\intercal)
+  \]
+  \subsubsection{Review}
+  \begin{enumerate}
+    \item \texttt{model.py: Encoder} and \texttt{ReduceState}
+  \end{enumerate}
+  \subsection{Decoder}
+  \subsubsection{Spec}
+  The final encoder hidden is passed to decoder where $\mathbf{s}_j$ is a decoder state at time-step $j$ where during generation:
+  \[
+    \mathbf{s}_j \in \mathbb{R}^H = \text{LSTM}(\mathbf{s}_{j-1}, \mathbf{e}^*_{j})
+  \]
+  where:
+  \begin{enumerate}
+    \item $e_s$ and $e_t$ are sharing weight.
+    \item $\mathbf{s}_0 = (\mathbf{h}_{T_s}',\mathbf{c}_{T_s}')$.
+    \item $\mathbf{h}^*_0 = 0$
+    \item $\hat{y}_j = y_{j-1}$, teacher forcing.
+    \item $\mathbf{e^*_{j}} = [e_t(\hat{y}_{j}); \mathbf{h}^*_{j}] (\mathbf{W}^{(2H + i) \times i})^\intercal$
+  \end{enumerate}
+  The output is as follows.
+  \[
+    \mathbf{o}_j = ([\mathbf{s}_j;\mathbf{h}^*_j] (\mathbf{W}^{H \times 3H})^\intercal + b) (\mathbf{W}^{H\times V})^\intercal +b
+  \]
+  Distribution is:
+  \[
+    p(y_j|y_{<j}, x_{1:T_s}) = \text{Softmax}(\mathbf{o}_j)
+  \]
+  \subsubsection{Review}
+  \texttt{model.py}: \texttt{Decoder} class
+  \subsection{Attention}
+  \subsubsection{Spec}
+  A dynamic fixed length vector (context vector with attention),
+  \[
+    \mathbf{h}^*_j \in \mathbb{R}^{2H}= \sum_{i = 1}^{T_s} \alpha_{ij} \mathbf{h}_i
+  \]
+  The $\alpha_{ij}$ is the attention probability that is determined by:
+  \[
+    \alpha_{ij} = \frac{e^{\eta(\mathbf{s}'_j, \mathbf{cov}^{j}_{i}, \mathbf{h}_i)}}{\sum_{i'}e^{\eta(\mathbf{s}'_j, \mathbf{cov}^{j}_{i'},\mathbf{h}_{i'})}}
+  \]
+  where:
+  \begin{enumerate}
+    \item The coverage is determined by:
+    \[
+      \mathbf{cov}^{j}_{i} = \sum_{j'=0}^{j-1} a^{j'}_i
+    \]
+    and
+    \[
+      \mathbf{cov}^{0}_{i} = 0
+    \]
+    \item $\mathbf{s}'_0 \in \mathbb{R}^{2h} = [\mathbf{h}'_{T_s}; \mathbf{c}'_{T_s}]$
+    \item The scoring function $\eta(\cdot)$ is as follows.
+    \[
+      \eta(\mathbf{s}'_{j}, \mathbf{cov}^{j}_{i}, \mathbf{h}_i) = ([\mathbf{s}'_{j}; \mathbf{cov}^{j}_{i}; \mathbf{h}_i] (\mathbf{W}^{2h\times 2h})^\intercal + \mathbf{b}) (\mathbf{v}^{1\times 2h})^\intercal
+    \]
+  \end{enumerate}
+  \subsection{Loss Function}
+  The class distribution is determined as follows.
+  \[
+    P(w) = p_{\text{gen}}  P_{\text{vocab}}(w) + (1-p_{\text{gen}})\sum_{i:w_i=w}a_i^t
+  \] 
+  where:
+  \[
+    p_{\text{gen}} = \sigma([\mathbf{h}^*_j;\mathbf{s}_j;\mathbf{e}^*_j](\mathbf{W}^{1\times (3h+i)})^\intercal + b)   
+  \]
+
+
+
+
+
+
+\subsubsection{Math}
+\section{CopyNet}
+  CopyNet from https://arxiv.org/pdf/1603.06393.
+\subsection{Model details}
+  Source sentence,
+  \[
+    X = [x_1, \cdots, x_{T_s}]
+  \] to a dynamic fixed length vector (context vector with attention),
+  \[
+    \mathbf{c}_j = \sum_{i = 1}^{T_s} \alpha_{ij} \mathbf{h}_i
+  \]
+  \[
+    \alpha_{ij} = \frac{e^{\eta(\mathbf{s}_{j-1}, \mathbf{h}_i)}}{\sum_{i'}e^{\eta(\mathbf{s}_{j-1}, \mathbf{h}_{i'})}}
+  \]
+  where $\mathbf{h}_i$ is an encoder state at timestep $i$
+  \[
+    \mathbf{h}_i = f_s(e_s(x), \mathbf{h}_{i-1})
+  \]
+  and $\mathbf{s}_j$ is a decoder state at timestep $j$ where during generation:
+  \[
+    \mathbf{s}_j = f_t(e_t(y_{j-1}), \mathbf{s}_{j-1}, \mathbf{c}_{j})
+  \]
+  where
+  \begin{enumerate}
+    \item $f_s$ is a bi-LSTM for source sequence.
+    \item $f_t$ is an LSTM for target sequence.
+    \item $e_s$ and $e_t$ are embedding for source and target sequence.
+    \item $\eta$ is a scoring function using MLP.
+  \end{enumerate}
+  and during copying:
+  \[
+    \mathbf{s}_j = f_t([e_t(y_{j-1}); \zeta(y_{j-1})], \mathbf{s}_{j-1}, \mathbf{c}_{j})
+  \]
+  where
+  \[
+    \zeta{y_{j-1}} = \sum_{i=1}^{T_s} \rho_{ij} \mathbf{h}_i
+  \]
+  and
+  \[
+    \rho_{ij} =
+    \begin{cases}
+      \frac{1}{K} p_c(x_i|\mathbf{s}_j, \mathbf{M}), & x_i = y_{j-1} \\
+      0, & \text{otherwise}
+    \end{cases}
+  \]
+  where $K$ is a normalization for $x_i$. The need of another normalization is due to the possibility of having several duplicates with the same probability.
+
+  The initial encoder, and decoder state are
+  \[
+    \mathbf{h}_0 = 0 \in \mathbb{R}^{D_h}
+  \]
+  \[
+    \mathbf{s}_0 = \mathbf{h}_{T_s} \in \mathbb{R}^{D_h}
+  \]
+  where $D_h$ is a hidden dimension.
+
+  The predicted target symbol $y_j$ is sampled from a distribution or copied from source text
+  \[
+    p(y_j|y_{\leq j}, X) = p_g(y_j|y_{\leq j}, X) + p_c(y_j|y_{\leq j}, X)
+  \]
+  where
+  \begin{enumerate}
+    \item $p_g$ and $p_c$ are the distribution of generate and copy mode.
+    \item $g$ is an output function (MLP and softmax).
+    \end{enumerate}
+
+  The distribution of generate mode is
+  \[
+    p_g(y_j|y_{\leq j}, X) =
+    \begin{cases}
+      \frac{1}{\mathbf{Z}} e^{{\psi}_g(y_j)}, & y_j \in \mathcal{V} \\
+      0, & y_t \in \mathcal{X} \cap \mathcal{\bar{V}} \\
+      \frac{1}{\mathbf{Z}} e^{{\psi}_g(\text{UNK})}, & y_t \not\in \mathcal{X} \cap \mathcal{V}
+    \end{cases}
+  \]
+
+  The distribution of copy mode is
+  \[
+    p_c(y_j|y_{\leq j}, X) =
+    \begin{cases}
+      \frac{1}{\mathbf{Z}} \sum_{i:x_i=y_j} e^{{\psi}_c(x_i)}, & y_j \in \mathcal{X} \\
+      0, & \text{otherwise}
+    \end{cases}
+  \]
+  where
+  \begin{enumerate}
+    \item $\psi_g$ and $\psi_c$ are scoring function for generate and copy mode.
+    \item $Z$ is a normalization $Z = \sum_{v \in \mathcal{V} \cup \{UNK\}} e^{\psi_g(v)} + \sum_{x \in \mathcal{X}} e^{\psi_c(x)}$
+  \end{enumerate}
+
+  The scoring function for generate and copy mode are:
+  \[
+    \psi_g(y_j = v_k) = \mathbf{v_k}^\intercal \mathbf{W}_o \mathbf{s_j},\,\, v_k \in \mathcal{V} \cup \text{UNK}
+  \]
+  where
+  \begin{enumerate}
+    \item $\mathbf{W}_o \in \mathbb{R}^{(N+1)\times H_d}$
+    \item $\mathbf{v}_k$ is a one-hot encoding for $v_k$.
+  \end{enumerate}
+  \[
+    \psi_c(y_j = x_k) = \sigma (\mathbf{h}_k^\intercal \mathbf{W}_c) \mathbf{s_j},\,\, x_k \in \mathcal{X}
+  \]
+  where
+  \begin{enumerate}
+    \item $\mathbf{W}_c \in \mathbb{R}^{H_d\times H_d}$
+    \item $\sigma$ is a non-linear activation function (tanh)
+  \end{enumerate}
+\subsection{Implementation}
+The following is the implementation guideline from AllenNLP copynet model.
+\subsubsection{CopyNetDatasetReader}
+The following are the outputs of the custom reader:
+\begin{enumerate}
+  \item source tokens
+  \item source token ids which is a separate indexing scheme that use the document+target vocabulary (instance specific) in contrast with source tokens which use global vocabulary. Target token ids is the reverse of source token ids.
+  \item source to target is the mapping which use the vocabulary of target namespace to index the source (build using Namespace swapping field).
+  \item metadata is the text sequence from the source and target (build using Metadata field).
+\end{enumerate}
+
+Technical noteworthy:
+\begin{enumerate}
+  \item NamespaceSwappingField takes tokens and map it using another namespace.
+\end{enumerate}
+\end{document}
