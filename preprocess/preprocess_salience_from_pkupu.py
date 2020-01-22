@@ -28,7 +28,7 @@ nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
 def gen_salience_instance(document_path: Path, summary_path: Path, set_name: str, index: dict) -> Tuple[str, Instance]:
     for doc_f in document_path.iterdir():
         doc_id = doc_f.stem
-        if doc_id not in index[set_name]:
+        if index.get(doc_id, None) != set_name:
             continue
         summ_f = summary_path / f'{doc_id}.fs'
         doc_content = [[word.lower() for word in line.strip().split()] for line in doc_f.open().readlines()]
@@ -83,7 +83,7 @@ def main():
     summs_path = Path(args.summs_pku)
     max_words = args.max_words
     modes = args.modes
-    index = json.load(open(args.index))
+    index = {doc_id: dataset for dataset, doc_ids in json.load(open(args.index)).items() for doc_id in doc_ids}
     summ_groups = []
     # The folder name has to match these names
     if args.submodular:
@@ -155,6 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('-highlight', help='Path to pandas highlight.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
     parser.add_argument('-extra_name', help='Additional name for the output file path.', default='tagged')
-    parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups', default=['all'])
+    parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups',
+                        default=['all'])
     args = parser.parse_args()
     main()
