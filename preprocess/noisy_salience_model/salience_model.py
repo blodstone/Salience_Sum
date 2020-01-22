@@ -89,13 +89,12 @@ class Dataset(MutableMapping[str, Instance]):
     def __iter__(self):
         return iter(self.dataset)
 
-    def write_to_file(self, output_path: Path, extra_name: str = 'tagged'):
+    def write_to_file(self, output_path: Path, extra_name: str):
         output_docs = []
         output_summs = []
         output_tsvs = []
-        summ_groups = None
+        summ_groups = []
         for _, instance in self.dataset.items():
-            summ_groups = []
             salience_sets = []
             for summ_group, salience_set in instance.salience_set.salience_set.items():
                 summ_groups.append(summ_group)
@@ -106,7 +105,8 @@ class Dataset(MutableMapping[str, Instance]):
                 for token in zip(line, *salience_values):
                     output_token = u'￨'.join([str(t) for t in token])
                     output_line.append(output_token)
-            output_tsvs.append(' '.join(output_line) + '\t' + ' '.join(instance.summ))
+            summ = [token for line in instance.summ for token in line]
+            output_tsvs.append(' '.join(output_line) + '\t' + ' '.join(summ))
             output_docs.append(' '.join(output_line))
             output_summs.append(' '.join([' '.join(tokens) for tokens in instance.summ]))
         output_docs = '\n'.join(output_docs)
@@ -119,4 +119,4 @@ class Dataset(MutableMapping[str, Instance]):
         tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
         tgt_file.write_text(output_summs)
         info_file = output_path / 'summ_groups.txt'
-        info_file.write_text(u'￨'.join(summ_groups))
+        info_file.write_text(u'￨'.join(list(set(summ_groups))))

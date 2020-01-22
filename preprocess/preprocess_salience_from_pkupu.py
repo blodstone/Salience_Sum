@@ -46,7 +46,7 @@ def process(dataset, max_words):
         for name, salience in salience_set.salience_set.items():
             if name in ['tfidf', 'NER']:
                 continue
-            salience_sets = [5*salience]
+            salience_sets = [salience]
             ner_idx = -1
             tfidf_idx = -1
             if 'NER' in salience_set.salience_set.keys():
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('--gold', help='Gold annotations.', action='store_true')
     parser.add_argument('-highlight', help='Path to pandas highlight.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
-    parser.add_argument('-extra_name', help='Additional name for the output file path.', default='')
+    parser.add_argument('-extra_name', help='Additional name for the output file path.', default='tagged')
     parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups', default=['all'])
     args = parser.parse_args()
     main()
