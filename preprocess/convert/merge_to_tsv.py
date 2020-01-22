@@ -1,28 +1,45 @@
 """
 Take a src and tgt files (standard input in opennmt and fairseq) and join them into a single tsv
 """
-import os
+import json
+import argparse
+from pathlib import Path
 
-from allennlp.common import Tqdm
 
+def main():
+    raw_docs = Path(args.raw_docs)
+    raw_summs = Path(args.raw_summs)
+    index = json.load(open(args.index))
+    reverse_index = {doc_id: dataset for dataset, doc_id in index.item()}
+    output_path = Path(args.output_path)
 
-def gen_line(path):
-    file = open(path)
-    for line in file:
-        yield line
-    file.close()
+    output_text = {
+        'train': [],
+        'test': [],
+        'validation': []
+    }
+    for i, raw_doc in enumerate(raw_docs.iterdir()):
+        doc_id = raw_doc.stem
+        if doc_id in reverse_index:
+            print(f'{doc_id} ({i})')
+            summary_text = ' '.join(
+                [line.strip().lower() for line in (raw_summs / f'{doc_id}.fs').open().readlines()])
+            text = ' '.join([line.strip().lower() for line in raw_doc.open().readlines()])
+            tsv = f'{text}\t{summary_text}'
+            dataset = reverse_index[doc_id]
+            output_text[dataset].append(tsv)
+        if i > 5:
+            break
+
+    for dataset, text_list in output_text.items():
+        (output_path / f'{dataset}.tsv').write_text('\n'.join(text_list))
 
 
 if __name__ == '__main__':
-    src_path = '../data/bbc/val.txt.src'
-    tgt_path = '../data/bbc/val.txt.tgt'
-    src = gen_line(src_path)
-    tgt = gen_line(tgt_path)
-    new_lines = []
-    i = 0
-    for src_line, tgt_line in Tqdm.tqdm(zip(src, tgt)):
-        new_line = src_line.strip() + '\t' + tgt_line.strip() + '\n'
-        new_lines.append(new_line)
-    file = open(os.path.join('../data/bbc/', os.path.basename(src_path).split('.')[0]+'.tsv'), 'w')
-    file.writelines(new_lines)
-    file.close()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-raw_docs', help='The raw documents of BBC.')
+    parser.add_argument('-raw_summs', help='The raw summaries of BBC.')
+    parser.add_argument('-index', help='The index for splitting raw document.')
+    parser.add_argument('-output_path', help='The output path.')
+    args = parser.parse_args()
+    main()
