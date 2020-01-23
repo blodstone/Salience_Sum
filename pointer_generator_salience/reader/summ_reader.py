@@ -29,14 +29,15 @@ class SummDataReader(DatasetReader):
         self._use_salience = use_salience
 
     def process_line(self, line):
-        src_tagged_seq, tgt_seq = line.split('\t')
-        src_seq, salience_seq = zip(*[group.split(u'￨') for group in src_tagged_seq.split()])
-        assert len(src_seq) == len(salience_seq)
+        src_seq, tgt_seq = line.split('\t')
         if self._use_salience:
+            src_seq, salience_seq = zip(*[group.split(u'￨') for group in src_seq.split()])
+            assert len(src_seq) == len(salience_seq)
             return [Token(token) for token in src_seq], \
                    [Token(token) for token in tgt_seq.split()], \
                    [float(value) for value in salience_seq]
         elif self._predict:
+            src_seq, salience_seq = zip(*[group.split(u'￨') for group in src_seq.split()])
             return [Token(token) for token in src_seq],
         else:
             return [Token(token) for token in src_seq], [Token(token) for token in tgt_seq.split()]
