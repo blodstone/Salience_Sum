@@ -30,7 +30,7 @@ class SummDataReader(DatasetReader):
 
     def process_line(self, line):
         src_tagged_seq, tgt_seq = line.split('\t')
-        src_seq, salience_seq = zip(*[group.split('|%|') for group in src_tagged_seq.split()])
+        src_seq, salience_seq = zip(*[group.split(u'￨') for group in src_tagged_seq.split()])
         assert len(src_seq) == len(salience_seq)
         if self._use_salience:
             return [Token(token) for token in src_seq], \

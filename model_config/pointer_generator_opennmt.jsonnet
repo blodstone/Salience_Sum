@@ -1,4 +1,4 @@
-local HIDDEN=256;
+local HIDDEN=512;
 local EMBEDDING=128;
 local CUDA=0;
 {
@@ -7,12 +7,12 @@ local CUDA=0;
     "lazy": false,
     "interpolation": false,
     "predict": false,
-    "use_salience": true,
+    "use_salience": false,
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "data/bbc_allen/train.tsv.tagged",
-  "validation_data_path": "data/bbc_allen/validation.tsv.tagged",
+  "train_data_path": "data/bbc/ready/train.tsv",
+  "validation_data_path": "data/bbc/ready/validation.tsv",
   "model": {
     "type": "encoder_decoder_salience",
     "encoder": {
@@ -21,7 +21,7 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 0.8,
+    "teacher_force_ratio": 1.0,
     "coverage_lambda": 0.0,
     "salience_lambda": 0.0,
     "decoder": {
@@ -31,7 +31,6 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
-      "num_layers": 1,
     },
     "salience_predictor": {
       "hidden_size": HIDDEN,
@@ -60,17 +59,16 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 16,
+    "batch_size" : 32,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
     "summary_interval": 500,
     "histogram_interval": 1000,
     "num_epochs": 50,
-    "patience": 5,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
-    "grad_clipping": 2,
+    "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",
       "lr": 0.15,
