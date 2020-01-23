@@ -10,7 +10,7 @@ def main():
     raw_docs = Path(args.raw_docs)
     raw_summs = Path(args.raw_summs)
     index = json.load(open(args.index))
-    reverse_index = {doc_id: dataset for dataset, doc_id in index.items()}
+    reverse_index = {doc_id: dataset for dataset, doc_ids in index.items() for doc_id in doc_ids}
     output_path = Path(args.output_path)
 
     output_text = {
