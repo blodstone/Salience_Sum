@@ -23,9 +23,9 @@ if __name__ == '__main__':
     vocab = Vocabulary.from_files(args.vocab_path)
     model = Model.from_params(vocab=vocab, params=config.get('model'))
     model.load_state_dict(model_state)
-    predictor = Seq2SeqPredictor(model=model, data_reader=reader, batch_size=4, cuda_device=-1)
+    predictor = Seq2SeqPredictor(model=model, data_reader=reader, batch_size=24, cuda_device=-1)
     output = predictor.predict(file_path=args.input, vocab_path=args.vocab_path)
     for out in output:
-        predictions = out['predictions']
+        predictions = out['results']
         for sent in predictions['predictions']:
             print(' '.join([vocab.get_index_to_token_vocabulary()[idx.item()] for idx in sent[0]]))

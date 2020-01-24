@@ -142,8 +142,10 @@ class EncoderDecoder(Model):
             for each source sentence in the batch.
         """
         # shape: (group_size, num_classes)
+        tokens = last_predictions
+        tokens[tokens >= self.vocab.get_vocab_size()] = self.unk_idx
         emb = self.target_embedder({
-            'tokens': last_predictions
+            'tokens': tokens
         })
         state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
         return state['class_probs'].squeeze(1).log(), state

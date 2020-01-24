@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Union, MutableMapping
 
@@ -90,11 +91,21 @@ class Dataset(MutableMapping[str, Instance]):
         return iter(self.dataset)
 
     def write_to_file(self, output_path: Path, extra_name: str):
-        output_docs = []
-        output_summs = []
-        output_tsvs = []
         summ_groups = []
-        for _, instance in self.dataset.items():
+        tsv_file = output_path / f'{self.dataset_name}.{extra_name}.tsv'
+        src_file = output_path / f'{self.dataset_name}.{extra_name}.src.txt'
+        tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
+        if tsv_file.exists():
+            print(f'{str(tsv_file)} exists. Deleting file.')
+            os.remove(str(tsv_file))
+        if src_file.exists():
+            print(f'{str(src_file)} exists. Deleting file.')
+            os.remove(str(src_file))
+        if tgt_file.exists():
+            print(f'{str(tgt_file)} exists. Deleting file.')
+            os.remove(str(tgt_file))
+        i = 1
+        for doc_id, instance in self.dataset.items():
             salience_sets = []
             for summ_group, salience_set in instance.salience_set.salience_set.items():
                 summ_groups.append(summ_group)
@@ -106,17 +117,10 @@ class Dataset(MutableMapping[str, Instance]):
                     output_token = u'￨'.join([str(t) for t in token])
                     output_line.append(output_token)
             summ = [token for line in instance.summ for token in line]
-            output_tsvs.append(' '.join(output_line) + '\t' + ' '.join(summ))
-            output_docs.append(' '.join(output_line))
-            output_summs.append(' '.join([' '.join(tokens) for tokens in instance.summ]))
-        output_docs = '\n'.join(output_docs)
-        output_tsvs = '\n'.join(output_tsvs)
-        output_summs = '\n'.join(output_summs)
-        tsv_file = output_path / f'{self.dataset_name}.{extra_name}.tsv'
-        tsv_file.write_text(output_tsvs)
-        src_file = output_path / f'{self.dataset_name}.{extra_name}.src.txt'
-        src_file.write_text(output_docs)
-        tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
-        tgt_file.write_text(output_summs)
+            tsv_file.open('a').write(' '.join(output_line) + '\t' + ' '.join(summ) + '\n')
+            src_file.open('a').write(' '.join(output_line) + '\n')
+            tgt_file.open('a').write(' '.join(summ) + '\n')
+            print(f'Write to file ({i}): {doc_id}')
+            i += 1
         info_file = output_path / 'summ_groups.txt'
         info_file.write_text(u'￨'.join(list(set(summ_groups))))

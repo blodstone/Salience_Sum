@@ -1,5 +1,7 @@
 import argparse
 import json
+import pickle
+from collections import Counter
 from pathlib import Path
 from typing import Tuple
 
@@ -98,6 +100,7 @@ def main():
         summ_groups.append('AKE')
     if args.NER:
         summ_groups.append('NER')
+
     for dataset_name in set_names:
         dataset = Dataset(dataset_name)
         for doc_id, salience_instance in gen_salience_instance(
@@ -124,7 +127,23 @@ def main():
                 if dataset_name == 'train' and len(dataset) >= args.train_size:
                     break
         if args.tfidf:
-            dataset = tfidf.process(dataset)
+            doc_word_count = dict()
+            if args.doc_word_count and Path(args.doc_word_count).exists():
+                doc_word_count = pickle.load(Path(args.doc_word_count).open('rb'))
+            elif 'train' in set_names:
+                i = 1
+                for doc_id, salience_instance in gen_salience_instance(
+                        docs_path, golds_path, 'train', index):
+                    print(f'Building word count ({i}): {doc_id}')
+                    i += 1
+                    doc_word_count[doc_id] = Counter()
+                    for line in salience_instance.doc:
+                        doc_word_count[doc_id].update(line)
+                pickle.dump(doc_word_count, (output_path / 'doc_word_count.pickle').open('wb'))
+                print(f'Saving document word count.')
+            else:
+                raise Exception
+            dataset = tfidf.process(dataset, doc_word_count)
         if 'filter' in modes:
             dataset = process(dataset, max_words)
         dataset.write_to_file(output_path, args.extra_name)
@@ -150,6 +169,7 @@ if __name__ == '__main__':
                         action='store_true')
     parser.add_argument('-window', help='Window for Textrank, needed by AKE.',
                         default=5, type=int)
+    parser.add_argument('-doc_word_count', help='doc_word_count file for tfidf.')
     parser.add_argument('--NER', help='Named Entity Recognition.', action='store_true')
     parser.add_argument('--gold', help='Gold annotations.', action='store_true')
     parser.add_argument('-highlight', help='Path to pandas highlight.')
