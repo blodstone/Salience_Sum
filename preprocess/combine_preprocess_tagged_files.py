@@ -47,9 +47,12 @@ def main():
 
 
 def process(tsv_txt_files, mode, src_file, tgt_file, tsv_file):
+    i = 1
     for lines in zip(*tsv_txt_files):
         doc_ids = [line.split('\t')[0] for line in lines]
         assert len(list(set(doc_ids))) == 1
+        print(f'Process {doc_ids[0]}: ({i})')
+        i += 1
         tgt_seq = lines[0].split('\t')[2]
         src_seq = list(zip(*[group.split(u'￨') for group in lines[0].split('\t')[1].split()]))[0]
         salience_seqs = [list(zip(*[group.split(u'￨') for group in line.split('\t')[1].split()]))[1]
