@@ -12,9 +12,9 @@ def write_to_file(src_seq, salience_seq, tgt_seq, tsv_file, src_file, tgt_file):
     for token, salience_value in zip(src_seq, salience_seq):
         output_token = f'{token}￨{salience_value}'
         output_line.append(output_token)
-    tsv_file.open('a').write(' '.join(output_line) + '\t' + ' '.join(tgt_seq) + '\n')
+    tsv_file.open('a').write(' '.join(output_line) + '\t' + tgt_seq + '\n')
     src_file.open('a').write(' '.join(output_line) + '\n')
-    tgt_file.open('a').write(' '.join(tgt_seq) + '\n')
+    tgt_file.open('a').write(tgt_seq + '\n')
 
 
 def salience_sum(salience_seqs):
