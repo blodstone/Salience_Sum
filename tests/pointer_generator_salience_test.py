@@ -12,8 +12,8 @@ class TestPointerGeneratorSalienceModel:
                    shared_datadir: Path, datadir: Path):
         param_file = shared_datadir / 'model_config' / 'pointer_generator_salience.jsonnet'
         dataset_file = {
-            'train': shared_datadir / 'train.dev.tsv.tagged.small',
-            'validation': shared_datadir / 'validation.dev.tsv.tagged.small'
+            'train': '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/train.sum.tsv',
+            'validation': '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/validation.sum.tsv'
         }
         my_model = model(param_file, dataset_file, datadir)
         my_model.ensure_model_can_train_save_and_load(my_model.param_file)
