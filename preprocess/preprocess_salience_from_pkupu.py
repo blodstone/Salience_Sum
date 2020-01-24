@@ -123,9 +123,6 @@ def main():
                 continue
             print(f'Processed ({len(dataset)}): {doc_id}')
             dataset[doc_id] = salience_instance
-            if args.train_size is not None:
-                if dataset_name == 'train' and len(dataset) >= args.train_size:
-                    break
         if args.tfidf:
             doc_word_count = dict()
             if args.doc_word_count and Path(args.doc_word_count).exists():
@@ -159,7 +156,6 @@ if __name__ == '__main__':
     # We have a fixed set of summ folder name: submodular, centroid and textrank
     parser.add_argument('-summs_pku', help='Folder consisting of generated pkusumsum output for each set.')
     parser.add_argument('-output', help='Folder for generating the output.')
-    parser.add_argument('-train_size', help='Specify max train_size', default=None, type=int)
     parser.add_argument('--submodular', help='Submodular.', action='store_true')
     parser.add_argument('--centroid', help='Centroid.', action='store_true')
     parser.add_argument('--textrank', help='Textrank.', action='store_true')
@@ -171,8 +167,6 @@ if __name__ == '__main__':
                         default=5, type=int)
     parser.add_argument('-doc_word_count', help='doc_word_count file for tfidf.')
     parser.add_argument('--NER', help='Named Entity Recognition.', action='store_true')
-    parser.add_argument('--gold', help='Gold annotations.', action='store_true')
-    parser.add_argument('-highlight', help='Path to pandas highlight.')
     parser.add_argument('-max_words', help='Maximum words.', default=35, type=int)
     parser.add_argument('-extra_name', help='Additional name for the output file path.', default='tagged')
     parser.add_argument('-modes', nargs='+', help='Filter the salience to max words for each summ groups',

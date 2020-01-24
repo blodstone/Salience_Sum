@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Union, MutableMapping
+from typing import List, Dict, Any, Union, MutableMapping, Tuple
 
 from spacy.tokens import Doc
 
@@ -36,13 +36,11 @@ class SalienceSet(Dict[str, Salience]):
 
 class Instance:
 
-    def __init__(self, doc: Text, raw: Text, summ: Text, nlp_doc: Text = None
-                 ):
+    def __init__(self, doc: Text, raw: Text, summ: Text):
         self.summ = summ
         self.doc = doc
         self.raw = raw
         self.index_map = self.build_map()
-        self.nlp_doc = nlp_doc
         self.salience_set = SalienceSet()
         self.doc_size = [len(line) for line in doc]
 
@@ -52,19 +50,13 @@ class Instance:
             assert len(doc_line) == len(sal_line)
         self.salience_set[name] = salience
 
-    def build_map(self):
+    def build_map(self) -> Dict[int, Tuple[int, int]]:
         index_map = dict()
         idx = 0
         for i, line in enumerate(self.doc):
             for j, word in enumerate(line):
-                for _ in word:
-                    index_map[idx] = (i, j)
-                    idx += 1
-                index_map[idx] = (-1, -1)
+                index_map[idx] = (i, j)
                 idx += 1
-            idx -= 1
-        del index_map[idx]
-        assert len(index_map) == len(''.join([' '.join([word for word in line]) for line in self.doc]))
         return index_map
 
 
@@ -91,10 +83,10 @@ class Dataset(MutableMapping[str, Instance]):
         return iter(self.dataset)
 
     def write_to_file(self, output_path: Path, extra_name: str):
-        summ_groups = []
-        tsv_file = output_path / f'{self.dataset_name}.{extra_name}.tsv'
-        src_file = output_path / f'{self.dataset_name}.{extra_name}.src.txt'
-        tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
+        (output_path / extra_name).mkdir(parents=True, exist_ok=True)
+        tsv_file = output_path / extra_name / f'{self.dataset_name}.raw.tsv'
+        src_file = output_path / extra_name / f'{self.dataset_name}.raw.src.txt'
+        tgt_file = output_path / extra_name / f'{self.dataset_name}.raw.tgt.txt'
         if tsv_file.exists():
             print(f'{str(tsv_file)} exists. Deleting file.')
             os.remove(str(tsv_file))
@@ -104,11 +96,10 @@ class Dataset(MutableMapping[str, Instance]):
         if tgt_file.exists():
             print(f'{str(tgt_file)} exists. Deleting file.')
             os.remove(str(tgt_file))
-        i = 1
+        j = 1
         for doc_id, instance in self.dataset.items():
             salience_sets = []
             for summ_group, salience_set in instance.salience_set.salience_set.items():
-                summ_groups.append(summ_group)
                 salience_sets.append(salience_set)
             saliences = list(zip(*salience_sets))
             output_line = []
@@ -117,10 +108,8 @@ class Dataset(MutableMapping[str, Instance]):
                     output_token = u'￨'.join([str(t) for t in token])
                     output_line.append(output_token)
             summ = [token for line in instance.summ for token in line]
-            tsv_file.open('a').write(' '.join(output_line) + '\t' + ' '.join(summ) + '\n')
-            src_file.open('a').write(' '.join(output_line) + '\n')
-            tgt_file.open('a').write(' '.join(summ) + '\n')
-            print(f'Write to file ({i}): {doc_id}')
-            i += 1
-        info_file = output_path / 'summ_groups.txt'
-        info_file.write_text(u'￨'.join(list(set(summ_groups))))
+            tsv_file.open('a').write(doc_id + '\t' + ' '.join(output_line) + '\t' + ' '.join(summ) + '\n')
+            src_file.open('a').write(doc_id + '\t' + ' '.join(output_line) + '\n')
+            tgt_file.open('a').write(doc_id + '\t' + ' '.join(summ) + '\n')
+            print(f'Write to file ({j}): {doc_id}')
+            j += 1
