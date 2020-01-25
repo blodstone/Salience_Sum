@@ -187,7 +187,6 @@ class EncoderDecoder(Model):
         state = self.init_enc_state(source_tokens)
         # (Batch, Seq, Emb Dim)
         embedded_src = self.source_embedder(source_tokens)
-        salience_values = salience_values.transpose(1, 2).contiguous()
         embedded_src = torch.cat([embedded_src, salience_values], dim=2)
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \

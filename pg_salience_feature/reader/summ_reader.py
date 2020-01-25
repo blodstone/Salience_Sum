@@ -106,7 +106,7 @@ class SummDataReader(DatasetReader):
                     padding_value=-1
                 )
             else:
-                salience_seq = [seq[:self._source_max_tokens] for seq in salience_seq]
+                salience_seq = [seq for seq in zip(*salience_seq)][:self._source_max_tokens]
                 salience_field = ArrayField(
                     np.array(salience_seq[:self._source_max_tokens]), padding_value=-1)
             output_field['salience_values'] = salience_field
