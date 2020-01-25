@@ -11,8 +11,8 @@
     },
     "source_max_tokens": 400
   },
-  "train_data_path": "/data/acp16hh/data/bbc_allen/bbc_tagged_summ/train.tsv.tagged",
-  "validation_data_path": "/data/acp16hh/data/bbc_allen/bbc_tagged_summ/val.tsv.tagged",
+  "train_data_path": "/data/acp16hh/data/bbc/ready/all/train.sum.tsv",
+  "validation_data_path": "/data/acp16hh/data/bbc/ready/all/validation.sum.tsv",
   "model": {
     "type": "crf_tagger",
     "text_field_embedder": {
@@ -43,6 +43,6 @@
     "cuda_device": 0
   },
   "vocabulary": {
-    "max_vocab_size": 200000
+    "max_vocab_size": 80000
   }
 }

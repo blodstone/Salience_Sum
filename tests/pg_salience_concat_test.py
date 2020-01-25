@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable, Dict
 
 from tests.conftest import ModelTestCase
-from pointer_generator_salience.reader.summ_reader import SummDataReader
+from pg_salience_feature.reader.summ_reader import SummDataReader
 
 
 class TestPGSalienceConcatModel:
