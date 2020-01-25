@@ -7,11 +7,11 @@ from allennlp.data.token_indexers import SingleIdTokenIndexer
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from scipy.interpolate import CubicSpline
 
-from pointer_generator_salience.reader.copy_field import CopyField
-from pointer_generator_salience.reader.target_copy_field import TargetCopyField
+from pg_salience_feature.reader.copy_field import CopyField
+from pg_salience_feature.reader.target_copy_field import TargetCopyField
 
 
-@DatasetReader.register("summdatareader_salience")
+@DatasetReader.register("summdatareader_salience_feature")
 class SummDataReader(DatasetReader):
 
     def __init__(self,
