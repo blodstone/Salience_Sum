@@ -5,7 +5,7 @@
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb
 #$ -j y
-#$ -o pg_salience_feature_concat.txt
+#$ -o pg_salience_feature_sum.txt
 #$ -wd /home/acp16hh/Salience_Sum
 git checkout dev
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/pg_salience_feature/sum
