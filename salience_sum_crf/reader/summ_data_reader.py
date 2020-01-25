@@ -26,6 +26,9 @@ class SummDataReader(DatasetReader):
     def _read(self, file_path: str) -> Iterable[Instance]:
         with open(file_path) as file:
             for line in file:
+                line = line.strip()
+                if line == '':
+                    continue
                 src_tagged_seq, tgt_seq = line.split('\t')
                 src_seq, salience_seq = zip(*[group.split(u'￨') for group in src_tagged_seq.split()])
                 assert len(src_seq) == len(salience_seq)
