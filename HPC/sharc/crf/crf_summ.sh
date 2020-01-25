@@ -8,7 +8,6 @@
 #$ -o crf_summ_log.txt
 #$ -wd /home/acp16hh/Salience_Sum
 git checkout dev
-export CUDA_VISIBLE_DEVICES=0
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/crf/crf_summ
 module load apps/python/conda
 module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
