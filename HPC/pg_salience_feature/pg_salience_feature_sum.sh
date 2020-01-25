@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #$ -l gpu=1
-#$ -l rmem=16G
+#$ -l rmem=32G
 #$ -l h_rt=96:00:00
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb
