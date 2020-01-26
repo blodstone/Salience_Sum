@@ -1,6 +1,7 @@
 import argparse
 
-from pointer_generator_salience import summarizer
+from pointer_generator_salience import summarizer as pg_summarizer
+from pg_salience_feature import summarizer as pg_sal_summarizer
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -19,5 +20,8 @@ if __name__ == '__main__':
     else:
         cuda = 'cpu'
     if args.module == 'pointer_generator_salience':
-        summarizer.summarize(args.input, args.vocab_path, args.model,
+        pg_summarizer.summarize(args.input, args.vocab_path, args.model,
+                             args.model_config, args.output_path, args.batch_size, cuda)
+    elif args.module == 'pg_salience_feature':
+        pg_sal_summarizer.summarize(args.input, args.vocab_path, args.model,
                              args.model_config, args.output_path, args.batch_size, cuda)
