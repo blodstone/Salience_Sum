@@ -16,7 +16,7 @@ def summarize(input, vocab_path, model, model_config, output_path, batch_size, c
     if output_file.exists():
         print('Output file already exists. Deleting it.')
         os.remove(str(output_file))
-    reader = SummDataReader(predict=True, source_max_tokens=400, use_salience=False)
+    reader = SummDataReader(predict=True, source_max_tokens=400, use_salience=True)
     config = Params.from_file(model_config)
     model_state = torch.load(model, map_location=torch.device(cuda))
     vocab = Vocabulary.from_files(vocab_path)
