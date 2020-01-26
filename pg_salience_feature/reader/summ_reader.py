@@ -38,6 +38,8 @@ class SummDataReader(DatasetReader):
             return_res.append([Token(token) for token in src_seq])
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
+            else:
+                return_res.append(None)
             return_res.append(salience_seqs)
         else:
             return_res.append([Token(token) for token in src_seq.split()])
