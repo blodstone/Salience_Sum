@@ -24,6 +24,8 @@ def summarize(input, vocab_path, model, model_config, output_path, batch_size, c
     model.load_state_dict(model_state)
     if cuda == 'cpu':
         cuda = -1
+    else:
+        cuda = 0
     predictor = Seq2SeqPredictor(model=model, data_reader=reader, batch_size=batch_size, cuda_device=cuda)
     output = predictor.predict(file_path=str(input_file), vocab=vocab)
     for out in output:

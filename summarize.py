@@ -15,7 +15,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.cuda:
-        cuda = 0
+        cuda = 'cuda'
     else:
         cuda = 'cpu'
     if args.module == 'pointer_generator_salience':
