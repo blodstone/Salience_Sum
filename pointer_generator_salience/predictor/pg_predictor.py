@@ -1,7 +1,7 @@
 import numpy
 import torch
 from allennlp.data import Vocabulary
-from allennlp.data.iterators import BucketIterator
+from allennlp.data.iterators import BucketIterator, BasicIterator
 from allennlp.models import Model
 from allennlp.nn import util
 from tqdm import tqdm
@@ -16,8 +16,7 @@ class Seq2SeqPredictor:
                  batch_size: int,
                  cuda_device: int):
         self.cuda_device = cuda_device
-        self.iterator = BucketIterator(batch_size=batch_size,
-                                       sorting_keys=[("source_tokens", "num_tokens")])
+        self.iterator = BasicIterator(batch_size=batch_size)
         self.model = model
         self.data_reader = data_reader
 
@@ -25,9 +24,8 @@ class Seq2SeqPredictor:
         out_dict = self.model(**batch)
         return out_dict
 
-    def predict(self, file_path: str, vocab_path: str):
+    def predict(self, file_path: str, vocab: Vocabulary):
         ds = self.data_reader.read(file_path)
-        vocab = Vocabulary.from_files(vocab_path)
         self.iterator.index_with(vocab)
         self.model.eval()
         pred_generator = self.iterator(ds, num_epochs=1, shuffle=False)
