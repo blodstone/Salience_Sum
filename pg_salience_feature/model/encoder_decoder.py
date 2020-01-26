@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Any
+from typing import Dict, Tuple, Any, List
 
 import torch
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
@@ -52,7 +52,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10, per_node_beam_size=5)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
@@ -81,7 +81,7 @@ class EncoderDecoder(Model):
 
     def _forward_beam_search(self,
                              state: Dict[str, torch.Tensor],
-                             source_ids: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+                             source_ids: Dict[str, torch.Tensor], source_text: List[List[str]]) -> Dict[str, List]:
         """Make forward pass during prediction using a beam search."""
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
@@ -93,11 +93,23 @@ class EncoderDecoder(Model):
         # shape (log_probabilities): (batch_size, beam_size)
         all_top_k_predictions, log_probabilities = self.beam.search(
             start_predictions, state, self.take_step)
+        system_summaries = []
+        for batch_prediction in all_top_k_predictions[:, 0, :].split(1, dim=1):
+            predict_tokens = []
+            for batch_idx, idx in enumerate(batch_prediction):
+                idx = idx.item()
+                if idx < self.vocab.get_vocab_size():
+                    token = self.vocab.get_token_from_index(idx)
+                else:
+                    token = source_text[batch_idx][
+                        (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
+                predict_tokens.append(token)
+            # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
+            system_summaries.append(predict_tokens)
+            # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
         output_dict = {
-            "class_log_probabilities": log_probabilities,
-            "predictions": all_top_k_predictions,
+            "predictions": list(zip(*system_summaries))
         }
-        return output_dict
 
     def take_step(self,
                   last_predictions: torch.Tensor,
@@ -146,9 +158,9 @@ class EncoderDecoder(Model):
 
     def forward(self,
                 source_tokens: Dict[str, torch.Tensor],
-                source_text: Dict[str, Any],
+                source_text: List[List[str]],
                 source_ids: Dict[str, torch.Tensor],
-                target_text: Dict[str, Any] = None,
+                target_text: List[List[str]] = None,
                 target_tokens: Dict[str, torch.Tensor] = None,
                 target_ids: torch.Tensor = None,
                 salience_values: torch.Tensor = None) \
@@ -156,7 +168,7 @@ class EncoderDecoder(Model):
         """
         The forward function of the encoder and decoder model
 
-        :param target_text: The raw target text
+        :param target_text: The raw text of target sequence
         :param source_ids: The source ids that is unique to the document
         :param source_text: The raw text of source sequence
         :param salience_values: The saliency values for source tokens
@@ -173,7 +185,7 @@ class EncoderDecoder(Model):
             output_dict['loss'] = self._compute_loss(target_tokens, target_ids, state)
 
         if not self.training and not target_tokens:
-            output_dict['results'] = self._forward_beam_search(state, source_ids)
+            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text)
         return output_dict
 
     def _encode(self, source_tokens: Dict[str, torch.Tensor], salience_values: torch.Tensor) \

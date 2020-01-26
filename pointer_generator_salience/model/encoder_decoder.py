@@ -88,8 +88,7 @@ class EncoderDecoder(Model):
     def _forward_beam_search(self,
                              state: Dict[str, torch.Tensor],
                              source_ids: Dict[str, torch.Tensor],
-                             source_text: List[List[str]],
-                             ) -> Dict[str, torch.Tensor]:
+                             source_text: List[List[str]]) -> Dict[str, List]:
         """Make forward pass during prediction using a beam search."""
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
