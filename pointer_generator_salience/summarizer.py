@@ -7,7 +7,9 @@ from allennlp.common import Params
 from allennlp.data import Vocabulary
 from allennlp.models import Model
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
-from pointer_generator_salience import SummDataReader, Seq2SeqPredictor
+
+from reader.summ_reader import SummDataReader
+from predictor.pg_predictor import Seq2SeqPredictor
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
