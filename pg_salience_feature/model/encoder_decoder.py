@@ -110,6 +110,7 @@ class EncoderDecoder(Model):
         output_dict = {
             "predictions": list(zip(*system_summaries))
         }
+        return output_dict
 
     def take_step(self,
                   last_predictions: torch.Tensor,
