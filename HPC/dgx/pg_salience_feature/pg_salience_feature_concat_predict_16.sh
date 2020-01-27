@@ -15,7 +15,7 @@ module load apps/python/conda
 module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
 source activate gwen
 
-python summarize.py -input /data/acp16hh/data/bbc/ready/all/test.concat.tsv -vocab_path $MODEL/vocabulary -model $MODEL/best.th -model_config HPC/dgx/pg_salience_feature/pg_salience_feature_concat_16.jsonnet -output_path $MODEL -module pg_salience_feature
+python summarize.py -input /data/acp16hh/data/bbc/ready/all/test.concat.tsv -vocab_path $MODEL/vocabulary -model $MODEL/best.th -model_config HPC/dgx/pg_salience_feature/pg_salience_feature_concat_16.jsonnet -output_path $MODEL -module pg_salience_feature --cuda
 
 cd postprocess
 
