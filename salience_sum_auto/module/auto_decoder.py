@@ -5,8 +5,8 @@ from allennlp.common import Registrable
 from allennlp.data import Vocabulary
 from torch.nn import LSTM, Module, Sequential, Linear, Tanh, Sigmoid, Softmax, ReLU
 
-from salience_sum.module.attention import Attention
-from salience_sum.module.copy_attention import CopyAttention
+from salience_sum_auto.module.attention import Attention
+from salience_sum_auto.module.copy_attention import CopyAttention
 
 
 class AutoDecoder(Module, Registrable):

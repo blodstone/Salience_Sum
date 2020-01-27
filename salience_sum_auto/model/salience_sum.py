@@ -8,9 +8,9 @@ from allennlp.nn import RegularizerApplicator, util
 from allennlp.nn.beam_search import BeamSearch
 from torch.nn import Sequential, Linear, LogSoftmax, CrossEntropyLoss, NLLLoss
 
-from salience_sum.module.auto_decoder import AutoDecoder
-from salience_sum.module.summ_decoder import Decoder
-from salience_sum.module.encoder import Encoder
+from salience_sum_auto.module.auto_decoder import AutoDecoder
+from salience_sum_auto.module.summ_decoder import Decoder
+from salience_sum_auto.module.encoder import Encoder
 
 
 @Model.register("salience_sum")
