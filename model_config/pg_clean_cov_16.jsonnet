@@ -11,8 +11,8 @@ local CUDA=0;
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "data/bbc/ready/train.tsv",
-  "validation_data_path": "data/bbc/ready/validation.tsv",
+  "train_data_path": "data/bbc/ready/clean/train.tsv",
+  "validation_data_path": "data/bbc/ready/clean/validation.tsv",
   "model": {
     "type": "encoder_decoder_salience",
     "encoder": {
