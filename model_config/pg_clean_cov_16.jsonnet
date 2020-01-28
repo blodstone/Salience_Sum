@@ -66,7 +66,7 @@ local CUDA=0;
   "trainer": {
     "summary_interval": 500,
     "histogram_interval": 1000,
-    "num_epochs": 26,
+    "num_epochs": 27,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
