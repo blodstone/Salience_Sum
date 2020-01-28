@@ -17,12 +17,17 @@ local CUDA=0;
   "model": {
     "type": "enc_dec_salience_feature",
     "encoder": {
-      "input_size": EMBEDDING + FEATURE,
+      "input_size": 2*EMBEDDING,
       "hidden_size": HIDDEN,
       "num_layers": 1,
       "bidirectional": true
     },
+    "salience_mode": "attn",
     "teacher_force_ratio": 1.0,
+    "salience_embedder":{
+      "hidden_size": EMBEDDING,
+      "feature_size": FEATURE,
+    },
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
@@ -55,13 +60,14 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 32,
+    "batch_size" : 16,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
     "summary_interval": 100,
     "histogram_interval": 100,
-    "num_epochs": 50,
+    "num_epochs": 30,
+    "patience": 10,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
