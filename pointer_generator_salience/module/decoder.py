@@ -69,18 +69,23 @@ class Decoder(Module, Registrable):
             input_emb = input_emb.unsqueeze(1)
         batch_size = input_emb.size(0)
         attention = None
+        if is_first_step and not is_training:
+            _, coverage_next, _ = self.attention(
+                hidden.view(batch_size, 1, hidden.size(2)), states, states_features, source_mask, coverage, is_coverage)
+            coverage = coverage_next
         x = self.input_context(torch.cat((input_emb, input_feed), dim=2))
         rnn_output, final = self.rnn(x,
                                      (hidden.view(1, batch_size, hidden.size(2)),
                                       context.view(1, batch_size, hidden.size(2))))
         if self.is_attention:
             # Attention step 0 to calculate coverage step 1
-            decoder_output, coverage, attention = self.attention(
+            decoder_output, coverage_next, attention = self.attention(
                 rnn_output, states, states_features, source_mask, coverage, is_coverage)
             input_feed = decoder_output
         else:
             input_feed = rnn_output
-
+        if is_training or is_first_step:
+            coverage = coverage_next
         if self.is_attention:
             state['class_probs'], state['p_gen'] = self._build_class_logits(
                 attention, decoder_output, rnn_output, x, source_ids, max_oov)
