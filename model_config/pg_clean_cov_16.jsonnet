@@ -60,7 +60,7 @@ local CUDA=0;
     "type": "bucket",
     "padding_noise": 0.0,
     "batch_size" : 16,
-    "instance_per_epoch": 3000,
+    "instances_per_epoch": 3000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
