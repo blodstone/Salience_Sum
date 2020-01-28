@@ -60,12 +60,13 @@ local CUDA=0;
     "type": "bucket",
     "padding_noise": 0.0,
     "batch_size" : 16,
+    "instance_per_epoch": 3000,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
     "summary_interval": 500,
     "histogram_interval": 1000,
-    "num_epochs": 29,
+    "num_epochs": 26,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
