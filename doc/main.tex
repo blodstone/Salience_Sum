@@ -4,6 +4,7 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{listings}
+\usepackage{dsfont}
 \title{Gwen Project}
 \begin{document}
 \section{Project Specification}
@@ -25,14 +26,20 @@
   Source sentence, $x_i \in \mathbb{R}^v$,
   \[
     X = [x_1, \cdots, x_{T_s}]
-  \] and target sentence, $y_j \in \mathbb{R}^v$,
+  \], source salience, $z_i \in \{1,0\}^f$
+  \[
+    Z = [z_1, \cdots, z_{T_s}]
+  \]
+  and target sentence, $y_j \in \mathbb{R}^v$,
   \[
     Y = [y_1, \cdots, y_{T_t}]
-  \]
+  \] 
   where:
   \begin{enumerate}
     \item $T_s$ and $T_t$ are 400 and 100.
     \item $y_{T_t}$, are BOS and EOS tokens.
+    \item $v$ is the number of vocabulary.
+    \item $f$ is the number of feature
   \end{enumerate}
   \subsubsection{Review}
   \begin{enumerate}
@@ -45,10 +52,41 @@
   \end{enumerate}
   \subsection{Encoder}
   \subsubsection{Spec}
-  The inputs are passed to LSTM to produce $\mathbf{h}_i$ and $\mathbf{c}_{i-1}$ which is an encoder hidden and context state at time-step $i$
-  \[
-    \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(e_s(x_i) \in \mathbb{R}^i, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
-  \]
+  The inputs are passed to LSTM to produce $\mathbf{h}_i$ and $\mathbf{c}_{i-1}$ which is an encoder hidden and context state at time-step $i$.
+  There are three variants for the input encoder:
+  \begin{enumerate}
+    \item The standard Encoder
+    \[
+      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(e_s(x_i) \in \mathbb{R}^E, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
+    \]
+    \item Salience as Raw
+    \[
+      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}([e_s(x_i), z_i] \in \mathbb{R}^{(E+f)}, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
+    \]
+    \item Salience as Embedding
+    \[
+      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}([e_s(x_i), e_z(z_i)] \in \mathbb{R}^{(E+f)}, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
+    \]
+    where:
+    $e_z(z_i) = \text{tanh} (z_i (\mathbf{W}^{f\times E})^\intercal + \mathbf{b}^E$)
+    \item Salience as Attended Embedding using Bilinear Attention 
+    \[
+      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(\mathbf{f}_i \in \mathbb{R}^E, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
+    \]
+    where:
+    \begin{enumerate}
+      \item $\mathbf{f} = \mathbf{P}^\intercal \mathbf{f'}$ \\
+      where $\mathbf{P} \in \mathbb{R}^{(K\times E)}$
+      \item $\mathbf{f'}_i = \text{BAN}(e_s(x_i), e_z(z_i))$
+      \item $\mathbf{f'}_i^k = (e_s(x_i)^\intercal \mathbf{U}')^\intercal_k\mathcal{A}(e_z(z_i)^\intercal\mathbf{V}')_k$\\
+      where $\mathbf{U}'\in \mathbb{R}^{E\times K}$, $\mathbf{V}' \in \mathbb{R}^{f\times K}$,$(e_s(x_i)^\intercal \mathbf{U}') \in \mathbb{R}$ and $(e_z(z_i)^\intercal\mathbf{V}')\in\mathbb{R}^f$
+      \item $\mathcal{A} = \text{softmax} ((((\mathds{1}\cdot \mathbf{p}^\intercal)\circ\, e_s(x_i)^\intercal \mathbf{U})(\mathbf{V}^\intercal e_z(z_i)))$ \\
+      where $\mathbf{p}\in\mathbb{R}^K$
+    \end{enumerate}
+
+  \end{enumerate}
+  
+
   Since it is a bidirectional LSTM, the hidden is as such.
   \[
     \mathbf{h}_i = [\overleftarrow{\mathbf{h}_i}, \overrightarrow{\mathbf{h}_i}]
