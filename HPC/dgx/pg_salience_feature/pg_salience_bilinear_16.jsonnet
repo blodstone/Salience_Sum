@@ -17,7 +17,7 @@ local CUDA=0;
   "model": {
     "type": "enc_dec_salience_feature",
     "encoder": {
-      "input_size": EMBEDDING + FEATURE,
+      "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
       "num_layers": 1,
       "bidirectional": true
