@@ -7,7 +7,7 @@
 #$ -j y
 #$ -P rse
 #$ -q rse.q
-#$ -o pg_salience_feature_concat_16_dgx.txt
+#$ -o pg_salience_bilinear_16.txt
 #$ -wd /home/acp16hh/Salience_Sum
 git checkout dev
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/pg_salience_feature/bilinear_16
