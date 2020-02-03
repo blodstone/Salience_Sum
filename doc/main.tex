@@ -1,295 +1,261 @@
-\documentclass{article}
-\usepackage{natbib}
-\usepackage{arxiv}
-\usepackage{amssymb}
-\usepackage{amsmath}
-\usepackage{listings}
-\usepackage{dsfont}
-\title{Gwen Project}
-\begin{document}
-\section{Project Specification}
-  This project is intended to explore the many variety of Seq2Seq architecture.
-  All the projects are build using AllenNLP framework.
-\section{Data}
-  BBC Dataset
-\section{Pointer Generator Salience}
-  This is our implementation of pointer generator that is repurposed for salience prediction.
+\NeedsTeXFormat{LaTeX2e}
 
-\section{Pointer Generator}
-  This sub-project re-implement the paper of See, 2017.
-  \subsection{Notes}
-  \begin{enumerate}
-    \item All index start from 1, the index of 0 is reserved for initialization.
-  \end{enumerate}
-  \subsection{Input}
-  \subsubsection{Spec}
-  Source sentence, $x_i \in \mathbb{R}^v$,
-  \[
-    X = [x_1, \cdots, x_{T_s}]
-  \], source salience, $z_i \in \{1,0\}^f$
-  \[
-    Z = [z_1, \cdots, z_{T_s}]
-  \]
-  and target sentence, $y_j \in \mathbb{R}^v$,
-  \[
-    Y = [y_1, \cdots, y_{T_t}]
-  \] 
-  where:
-  \begin{enumerate}
-    \item $T_s$ and $T_t$ are 400 and 100.
-    \item $y_{T_t}$, are BOS and EOS tokens.
-    \item $v$ is the number of vocabulary.
-    \item $f$ is the number of feature
-  \end{enumerate}
-  \subsubsection{Review}
-  \begin{enumerate}
-    \item \texttt{data.py}
-    \begin{enumerate}
-      \item \texttt{article2ids}: Convert words in article into indexes, in addition extend the vocabulary by the article' tokens that are not in vocabulary. Return ids (the article indexes) and oovs (extra word list that is not in vocabulary). Note oovs can be used to retrieve the token from the extended vocab index.
-      \item \texttt{abstract2ids}: Convert words in abstract into indexes with little caveat: the oov that exist in the article extended vocab is used instead of the unknown token.
-      \item \texttt{outputids2words}: Retrieving token based on index with mapping support for the extended vocabulary
-    \end{enumerate}
-  \end{enumerate}
-  \subsection{Encoder}
-  \subsubsection{Spec}
-  The inputs are passed to LSTM to produce $\mathbf{h}_i$ and $\mathbf{c}_{i-1}$ which is an encoder hidden and context state at time-step $i$.
-  There are three variants for the input encoder:
-  \begin{enumerate}
-    \item The standard Encoder
-    \[
-      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(e_s(x_i) \in \mathbb{R}^E, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
-    \]
-    \item Salience as Raw
-    \[
-      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}([e_s(x_i), z_i] \in \mathbb{R}^{(E+f)}, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
-    \]
-    \item Salience as Embedding
-    \[
-      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}([e_s(x_i), e_z(z_i)] \in \mathbb{R}^{(E+f)}, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
-    \]
-    where:
-    $e_z(z_i) = \text{tanh} (z_i (\mathbf{W}^{f\times E})^\intercal + \mathbf{b}^E$)
-    \item Salience as Attended Embedding using Bilinear Attention 
-    \[
-      \mathbf{h}_i \in \mathbb{R}^{2h}, \mathbf{c}_i \in \mathbb{R}^{2h} = \text{LSTM}(\mathbf{f}_i \in \mathbb{R}^E, (\mathbf{h}_{i-1}, \mathbf{c}_{i-1}))
-    \]
-    where:
-    \begin{enumerate}
-      \item $\mathbf{f}_i = \mathbf{P}^\intercal \mathbf{f'}_i$ \\
-      where $\mathbf{P} \in \mathbb{R}^{(K\times E)}$
-      \item $\mathbf{f'}_i = \text{BAN}(e_s(x_i), e_z(z_i))$
-      \item $\mathbf{f'}_i^k = (e_s(x_i)^\intercal \mathbf{U}')^\intercal_k\mathcal{A}(e_z(z_i)^\intercal\mathbf{V}')_k$\\
-      where $\mathbf{U}'\in \mathbb{R}^{E\times K}$, $\mathbf{V}' \in \mathbb{R}^{f\times K}$,$(e_s(x_i)^\intercal \mathbf{U}') \in \mathbb{R}$ and $(e_z(z_i)^\intercal\mathbf{V}')\in\mathbb{R}^f$
-      \item $\mathcal{A} = \text{softmax} ((((\mathds{1}\cdot \mathbf{p}^\intercal)\circ\, e_s(x_i)^\intercal \mathbf{U})(\mathbf{V}^\intercal e_z(z_i)))$ \\
-      where $\mathbf{p}\in\mathbb{R}^K$ and $\mathds{1}\in\mathbb{R}$
-    \end{enumerate}
+\ProcessOptions\relax
 
-  \end{enumerate}
-  
+% fonts
+\renewcommand{\rmdefault}{ptm}
+\renewcommand{\sfdefault}{phv}
 
-  Since it is a bidirectional LSTM, the hidden is as such.
-  \[
-    \mathbf{h}_i = [\overleftarrow{\mathbf{h}_i}, \overrightarrow{\mathbf{h}_i}]
-  \]
-  \[
-    \overleftarrow{\mathbf{h}_i}, \overrightarrow{\mathbf{h}_i} \in \mathbb{R}^h,
-  \]
-  The final state and context are reduced to half their dimension.
-  \[
-    \mathbf{h}'_{T_s} = \text{ReLU}(\mathbf{h}_{T_s} (\mathbf{W}^{H\times 2H})^\intercal)
-  \]
-  \[
-    \mathbf{c}'_{T_s} = \text{ReLU}(\mathbf{c}_{T_s} (\mathbf{W}^{H\times 2H})^\intercal)
-  \]
-  \subsubsection{Review}
-  \begin{enumerate}
-    \item \texttt{model.py: Encoder} and \texttt{ReduceState}
-  \end{enumerate}
-  \subsection{Decoder}
-  \subsubsection{Spec}
-  The final encoder hidden is passed to decoder where $\mathbf{s}_j$ is a decoder state at time-step $j$ where during generation:
-  \[
-    \mathbf{s}_j \in \mathbb{R}^H = \text{LSTM}(\mathbf{s}_{j-1}, \mathbf{e}^*_{j})
-  \]
-  where:
-  \begin{enumerate}
-    \item $e_s$ and $e_t$ are sharing weight.
-    \item $\mathbf{s}_0 = (\mathbf{h}_{T_s}',\mathbf{c}_{T_s}')$.
-    \item $\mathbf{h}^*_0 = 0$
-    \item $\hat{y}_j = y_{j-1}$, teacher forcing.
-    \item $\mathbf{e^*_{j}} = [e_t(\hat{y}_{j}); \mathbf{h}^*_{j}] (\mathbf{W}^{(2H + i) \times i})^\intercal$
-  \end{enumerate}
-  The output is as follows.
-  \[
-    \mathbf{o}_j = ([\mathbf{s}_j;\mathbf{h}^*_j] (\mathbf{W}^{H \times 3H})^\intercal + b) (\mathbf{W}^{H\times V})^\intercal +b
-  \]
-  Distribution is:
-  \[
-    p(y_j|y_{<j}, x_{1:T_s}) = \text{Softmax}(\mathbf{o}_j)
-  \]
-  \subsubsection{Review}
-  \texttt{model.py}: \texttt{Decoder} class
-  \subsection{Attention}
-  \subsubsection{Spec}
-  A dynamic fixed length vector (context vector with attention),
-  \[
-    \mathbf{h}^*_j \in \mathbb{R}^{2H}= \sum_{i = 1}^{T_s} \alpha_{ij} \mathbf{h}_i
-  \]
-  The $\alpha_{ij}$ is the attention probability that is determined by:
-  \[
-    \alpha_{ij} = \frac{e^{\eta(\mathbf{s}'_j, \mathbf{cov}^{j}_{i}, \mathbf{h}_i)}}{\sum_{i'}e^{\eta(\mathbf{s}'_j, \mathbf{cov}^{j}_{i'},\mathbf{h}_{i'})}}
-  \]
-  where:
-  \begin{enumerate}
-    \item The coverage is determined by:
-    \[
-      \mathbf{cov}^{j}_{i} = \sum_{j'=0}^{j-1} a^{j'}_i
-    \]
-    and
-    \[
-      \mathbf{cov}^{0}_{i} = 0
-    \]
-    \item $\mathbf{s}'_0 \in \mathbb{R}^{2h} = [\mathbf{h}'_{T_s}; \mathbf{c}'_{T_s}]$
-    \item The scoring function $\eta(\cdot)$ is as follows.
-    \[
-      \eta(\mathbf{s}'_{j}, \mathbf{cov}^{j}_{i}, \mathbf{h}_i) = ([\mathbf{s}'_{j}; \mathbf{cov}^{j}_{i}; \mathbf{h}_i] (\mathbf{W}^{2h\times 2h})^\intercal + \mathbf{b}) (\mathbf{v}^{1\times 2h})^\intercal
-    \]
-  \end{enumerate}
-  \subsection{Loss Function}
-  The class distribution is determined as follows.
-  \[
-    P(w) = p_{\text{gen}}  P_{\text{vocab}}(w) + (1-p_{\text{gen}})\sum_{i:w_i=w}a_i^t
-  \] 
-  where:
-  \[
-    p_{\text{gen}} = \sigma([\mathbf{h}^*_j;\mathbf{s}_j;\mathbf{e}^*_j](\mathbf{W}^{1\times (3h+i)})^\intercal + b)   
-  \]
+% set page geometry
+\usepackage[verbose=true,letterpaper]{geometry}
+\AtBeginDocument{
+  \newgeometry{
+    textheight=9in,
+    textwidth=6.5in,
+    top=1in,
+    headheight=14pt,
+    headsep=25pt,
+    footskip=30pt
+  }
+}
+
+\widowpenalty=10000
+\clubpenalty=10000
+\flushbottom
+\sloppy
 
 
 
+\newcommand{\headeright}{A Preprint}
+\newcommand{\undertitle}{A Preprint}
+
+\usepackage{fancyhdr}
+\fancyhf{}
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyheadoffset{0pt}
+\rhead{\scshape \footnotesize \headeright}
+\chead{\@title}
+\cfoot{\thepage}
 
 
+%Handling Keywords
+\def\keywordname{{\bfseries \emph Keywords}}%
+\def\keywords#1{\par\addvspace\medskipamount{\rightskip=0pt plus1cm
+\def\and{\ifhmode\unskip\nobreak\fi\ $\cdot$
+}\noindent\keywordname\enspace\ignorespaces#1\par}}
 
-\subsubsection{Math}
-\section{CopyNet}
-  CopyNet from https://arxiv.org/pdf/1603.06393.
-\subsection{Model details}
-  Source sentence,
-  \[
-    X = [x_1, \cdots, x_{T_s}]
-  \] to a dynamic fixed length vector (context vector with attention),
-  \[
-    \mathbf{c}_j = \sum_{i = 1}^{T_s} \alpha_{ij} \mathbf{h}_i
-  \]
-  \[
-    \alpha_{ij} = \frac{e^{\eta(\mathbf{s}_{j-1}, \mathbf{h}_i)}}{\sum_{i'}e^{\eta(\mathbf{s}_{j-1}, \mathbf{h}_{i'})}}
-  \]
-  where $\mathbf{h}_i$ is an encoder state at timestep $i$
-  \[
-    \mathbf{h}_i = f_s(e_s(x), \mathbf{h}_{i-1})
-  \]
-  and $\mathbf{s}_j$ is a decoder state at timestep $j$ where during generation:
-  \[
-    \mathbf{s}_j = f_t(e_t(y_{j-1}), \mathbf{s}_{j-1}, \mathbf{c}_{j})
-  \]
-  where
-  \begin{enumerate}
-    \item $f_s$ is a bi-LSTM for source sequence.
-    \item $f_t$ is an LSTM for target sequence.
-    \item $e_s$ and $e_t$ are embedding for source and target sequence.
-    \item $\eta$ is a scoring function using MLP.
-  \end{enumerate}
-  and during copying:
-  \[
-    \mathbf{s}_j = f_t([e_t(y_{j-1}); \zeta(y_{j-1})], \mathbf{s}_{j-1}, \mathbf{c}_{j})
-  \]
-  where
-  \[
-    \zeta{y_{j-1}} = \sum_{i=1}^{T_s} \rho_{ij} \mathbf{h}_i
-  \]
-  and
-  \[
-    \rho_{ij} =
-    \begin{cases}
-      \frac{1}{K} p_c(x_i|\mathbf{s}_j, \mathbf{M}), & x_i = y_{j-1} \\
-      0, & \text{otherwise}
-    \end{cases}
-  \]
-  where $K$ is a normalization for $x_i$. The need of another normalization is due to the possibility of having several duplicates with the same probability.
+% font sizes with reduced leading
+\renewcommand{\normalsize}{%
+  \@setfontsize\normalsize\@xpt\@xipt
+  \abovedisplayskip      7\p@ \@plus 2\p@ \@minus 5\p@
+  \abovedisplayshortskip \z@ \@plus 3\p@
+  \belowdisplayskip      \abovedisplayskip
+  \belowdisplayshortskip 4\p@ \@plus 3\p@ \@minus 3\p@
+}
+\normalsize
+\renewcommand{\small}{%
+  \@setfontsize\small\@ixpt\@xpt
+  \abovedisplayskip      6\p@ \@plus 1.5\p@ \@minus 4\p@
+  \abovedisplayshortskip \z@  \@plus 2\p@
+  \belowdisplayskip      \abovedisplayskip
+  \belowdisplayshortskip 3\p@ \@plus 2\p@   \@minus 2\p@
+}
+\renewcommand{\footnotesize}{\@setfontsize\footnotesize\@ixpt\@xpt}
+\renewcommand{\scriptsize}{\@setfontsize\scriptsize\@viipt\@viiipt}
+\renewcommand{\tiny}{\@setfontsize\tiny\@vipt\@viipt}
+\renewcommand{\large}{\@setfontsize\large\@xiipt{14}}
+\renewcommand{\Large}{\@setfontsize\Large\@xivpt{16}}
+\renewcommand{\LARGE}{\@setfontsize\LARGE\@xviipt{20}}
+\renewcommand{\huge}{\@setfontsize\huge\@xxpt{23}}
+\renewcommand{\Huge}{\@setfontsize\Huge\@xxvpt{28}}
 
-  The initial encoder, and decoder state are
-  \[
-    \mathbf{h}_0 = 0 \in \mathbb{R}^{D_h}
-  \]
-  \[
-    \mathbf{s}_0 = \mathbf{h}_{T_s} \in \mathbb{R}^{D_h}
-  \]
-  where $D_h$ is a hidden dimension.
+% sections with less space
+\providecommand{\section}{}
+\renewcommand{\section}{%
+  \@startsection{section}{1}{\z@}%
+                {-2.0ex \@plus -0.5ex \@minus -0.2ex}%
+                { 1.5ex \@plus  0.3ex \@minus  0.2ex}%
+                {\large\bf\raggedright}%
+}
+\providecommand{\subsection}{}
+\renewcommand{\subsection}{%
+  \@startsection{subsection}{2}{\z@}%
+                {-1.8ex \@plus -0.5ex \@minus -0.2ex}%
+                { 0.8ex \@plus  0.2ex}%
+                {\normalsize\bf\raggedright}%
+}
+\providecommand{\subsubsection}{}
+\renewcommand{\subsubsection}{%
+  \@startsection{subsubsection}{3}{\z@}%
+                {-1.5ex \@plus -0.5ex \@minus -0.2ex}%
+                { 0.5ex \@plus  0.2ex}%
+                {\normalsize\bf\raggedright}%
+}
+\providecommand{\paragraph}{}
+\renewcommand{\paragraph}{%
+  \@startsection{paragraph}{4}{\z@}%
+                {1.5ex \@plus 0.5ex \@minus 0.2ex}%
+                {-1em}%
+                {\normalsize\bf}%
+}
+\providecommand{\subparagraph}{}
+\renewcommand{\subparagraph}{%
+  \@startsection{subparagraph}{5}{\z@}%
+                {1.5ex \@plus 0.5ex \@minus 0.2ex}%
+                {-1em}%
+                {\normalsize\bf}%
+}
+\providecommand{\subsubsubsection}{}
+\renewcommand{\subsubsubsection}{%
+  \vskip5pt{\noindent\normalsize\rm\raggedright}%
+}
 
-  The predicted target symbol $y_j$ is sampled from a distribution or copied from source text
-  \[
-    p(y_j|y_{\leq j}, X) = p_g(y_j|y_{\leq j}, X) + p_c(y_j|y_{\leq j}, X)
-  \]
-  where
-  \begin{enumerate}
-    \item $p_g$ and $p_c$ are the distribution of generate and copy mode.
-    \item $g$ is an output function (MLP and softmax).
-    \end{enumerate}
+% float placement
+\renewcommand{\topfraction      }{0.85}
+\renewcommand{\bottomfraction   }{0.4}
+\renewcommand{\textfraction     }{0.1}
+\renewcommand{\floatpagefraction}{0.7}
 
-  The distribution of generate mode is
-  \[
-    p_g(y_j|y_{\leq j}, X) =
-    \begin{cases}
-      \frac{1}{\mathbf{Z}} e^{{\psi}_g(y_j)}, & y_j \in \mathcal{V} \\
-      0, & y_t \in \mathcal{X} \cap \mathcal{\bar{V}} \\
-      \frac{1}{\mathbf{Z}} e^{{\psi}_g(\text{UNK})}, & y_t \not\in \mathcal{X} \cap \mathcal{V}
-    \end{cases}
-  \]
+\newlength{\@abovecaptionskip}\setlength{\@abovecaptionskip}{7\p@}
+\newlength{\@belowcaptionskip}\setlength{\@belowcaptionskip}{\z@}
 
-  The distribution of copy mode is
-  \[
-    p_c(y_j|y_{\leq j}, X) =
-    \begin{cases}
-      \frac{1}{\mathbf{Z}} \sum_{i:x_i=y_j} e^{{\psi}_c(x_i)}, & y_j \in \mathcal{X} \\
-      0, & \text{otherwise}
-    \end{cases}
-  \]
-  where
-  \begin{enumerate}
-    \item $\psi_g$ and $\psi_c$ are scoring function for generate and copy mode.
-    \item $Z$ is a normalization $Z = \sum_{v \in \mathcal{V} \cup \{UNK\}} e^{\psi_g(v)} + \sum_{x \in \mathcal{X}} e^{\psi_c(x)}$
-  \end{enumerate}
+\setlength{\abovecaptionskip}{\@abovecaptionskip}
+\setlength{\belowcaptionskip}{\@belowcaptionskip}
 
-  The scoring function for generate and copy mode are:
-  \[
-    \psi_g(y_j = v_k) = \mathbf{v_k}^\intercal \mathbf{W}_o \mathbf{s_j},\,\, v_k \in \mathcal{V} \cup \text{UNK}
-  \]
-  where
-  \begin{enumerate}
-    \item $\mathbf{W}_o \in \mathbb{R}^{(N+1)\times H_d}$
-    \item $\mathbf{v}_k$ is a one-hot encoding for $v_k$.
-  \end{enumerate}
-  \[
-    \psi_c(y_j = x_k) = \sigma (\mathbf{h}_k^\intercal \mathbf{W}_c) \mathbf{s_j},\,\, x_k \in \mathcal{X}
-  \]
-  where
-  \begin{enumerate}
-    \item $\mathbf{W}_c \in \mathbb{R}^{H_d\times H_d}$
-    \item $\sigma$ is a non-linear activation function (tanh)
-  \end{enumerate}
-\subsection{Implementation}
-The following is the implementation guideline from AllenNLP copynet model.
-\subsubsection{CopyNetDatasetReader}
-The following are the outputs of the custom reader:
-\begin{enumerate}
-  \item source tokens
-  \item source token ids which is a separate indexing scheme that use the document+target vocabulary (instance specific) in contrast with source tokens which use global vocabulary. Target token ids is the reverse of source token ids.
-  \item source to target is the mapping which use the vocabulary of target namespace to index the source (build using Namespace swapping field).
-  \item metadata is the text sequence from the source and target (build using Metadata field).
-\end{enumerate}
+% swap above/belowcaptionskip lengths for tables
+\renewenvironment{table}
+  {\setlength{\abovecaptionskip}{\@belowcaptionskip}%
+   \setlength{\belowcaptionskip}{\@abovecaptionskip}%
+   \@float{table}}
+  {\end@float}
 
-Technical noteworthy:
-\begin{enumerate}
-  \item NamespaceSwappingField takes tokens and map it using another namespace.
-\end{enumerate}
-\end{document}
+% footnote formatting
+\setlength{\footnotesep }{6.65\p@}
+\setlength{\skip\footins}{9\p@ \@plus 4\p@ \@minus 2\p@}
+\renewcommand{\footnoterule}{\kern-3\p@ \hrule width 12pc \kern 2.6\p@}
+\setcounter{footnote}{0}
+
+% paragraph formatting
+\setlength{\parindent}{\z@}
+\setlength{\parskip  }{5.5\p@}
+
+% list formatting
+\setlength{\topsep       }{4\p@ \@plus 1\p@   \@minus 2\p@}
+\setlength{\partopsep    }{1\p@ \@plus 0.5\p@ \@minus 0.5\p@}
+\setlength{\itemsep      }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
+\setlength{\parsep       }{2\p@ \@plus 1\p@   \@minus 0.5\p@}
+\setlength{\leftmargin   }{3pc}
+\setlength{\leftmargini  }{\leftmargin}
+\setlength{\leftmarginii }{2em}
+\setlength{\leftmarginiii}{1.5em}
+\setlength{\leftmarginiv }{1.0em}
+\setlength{\leftmarginv  }{0.5em}
+\def\@listi  {\leftmargin\leftmargini}
+\def\@listii {\leftmargin\leftmarginii
+              \labelwidth\leftmarginii
+              \advance\labelwidth-\labelsep
+              \topsep  2\p@ \@plus 1\p@    \@minus 0.5\p@
+              \parsep  1\p@ \@plus 0.5\p@ \@minus 0.5\p@
+              \itemsep \parsep}
+\def\@listiii{\leftmargin\leftmarginiii
+              \labelwidth\leftmarginiii
+              \advance\labelwidth-\labelsep
+              \topsep    1\p@ \@plus 0.5\p@ \@minus 0.5\p@
+              \parsep    \z@
+              \partopsep 0.5\p@ \@plus 0\p@ \@minus 0.5\p@
+              \itemsep \topsep}
+\def\@listiv {\leftmargin\leftmarginiv
+              \labelwidth\leftmarginiv
+              \advance\labelwidth-\labelsep}
+\def\@listv  {\leftmargin\leftmarginv
+              \labelwidth\leftmarginv
+              \advance\labelwidth-\labelsep}
+\def\@listvi {\leftmargin\leftmarginvi
+              \labelwidth\leftmarginvi
+              \advance\labelwidth-\labelsep}
+
+% create title
+\providecommand{\maketitle}{}
+\renewcommand{\maketitle}{%
+  \par
+  \begingroup
+    \renewcommand{\thefootnote}{\fnsymbol{footnote}}
+    % for perfect author name centering
+    \renewcommand{\@makefnmark}{\hbox to \z@{$^{\@thefnmark}$\hss}}
+    % The footnote-mark was overlapping the footnote-text,
+    % added the following to fix this problem               (MK)
+    \long\def\@makefntext##1{%
+      \parindent 1em\noindent
+      \hbox to 1.8em{\hss $\m@th ^{\@thefnmark}$}##1
+    }
+    \thispagestyle{empty}
+    \@maketitle
+    \@thanks
+    %\@notice
+  \endgroup
+  \let\maketitle\relax
+  \let\thanks\relax
+}
+
+% rules for title box at top of first page
+\newcommand{\@toptitlebar}{
+  \hrule height 2\p@
+  \vskip 0.25in
+  \vskip -\parskip%
+}
+\newcommand{\@bottomtitlebar}{
+  \vskip 0.29in
+  \vskip -\parskip
+  \hrule height 2\p@
+  \vskip 0.09in%
+}
+
+% create title (includes both anonymized and non-anonymized versions)
+\providecommand{\@maketitle}{}
+\renewcommand{\@maketitle}{%
+  \vbox{%
+    \hsize\textwidth
+    \linewidth\hsize
+    \vskip 0.1in
+    \@toptitlebar
+    \centering
+    {\LARGE\sc \@title\par}
+    \@bottomtitlebar
+    \textsc{\undertitle}\\
+    \vskip 0.1in
+    \def\And{%
+      \end{tabular}\hfil\linebreak[0]\hfil%
+      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
+    }
+    \def\AND{%
+      \end{tabular}\hfil\linebreak[4]\hfil%
+      \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\ignorespaces%
+    }
+    \begin{tabular}[t]{c}\bf\rule{\z@}{24\p@}\@author\end{tabular}%
+  \vskip 0.4in \@minus 0.1in \center{\@date}   \vskip 0.2in
+  }
+}
+
+% add conference notice to bottom of first page
+\newcommand{\ftype@noticebox}{8}
+\newcommand{\@notice}{%
+  % give a bit of extra room back to authors on first page
+  \enlargethispage{2\baselineskip}%
+  \@float{noticebox}[b]%
+    \footnotesize\@noticestring%
+  \end@float%
+}
+
+% abstract styling
+\renewenvironment{abstract}
+{
+  \centerline
+  {\large \bfseries \scshape Abstract}
+  \begin{quote}
+}
+{
+  \end{quote}
+}
+
+\endinput
