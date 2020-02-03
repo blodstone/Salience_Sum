@@ -1,6 +1,6 @@
 local HIDDEN=512;
 local EMBEDDING=128;
-local FEATURE=1;
+local FEATURE=6;
 local CUDA=0;
 {
   "dataset_reader": {
@@ -12,8 +12,8 @@ local CUDA=0;
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "/data/acp16hh/data/bbc/ready/all/train.sum.tsv",
-  "validation_data_path": "/data/acp16hh/data/bbc/ready/all/validation.sum.tsv",
+  "train_data_path": "/data/acp16hh/data/bbc/ready/all/train.concat.tsv",
+  "validation_data_path": "/data/acp16hh/data/bbc/ready/all/validation.concat.tsv",
   "model": {
     "type": "enc_dec_salience_feature",
     "encoder": {
@@ -22,7 +22,17 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 1.0,
+    "salience_source_mixer":{
+      "type": "emb_mlp",
+      "embedding_size": EMBEDDING,
+      "feature_size": FEATURE,
+      "salience_embedder": {
+        "embedding_size": EMBEDDING,
+        "feature_size": FEATURE,
+        "type": "vector",
+      },
+    },
+    "teacher_force_ratio": 0.7,
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
@@ -55,15 +65,16 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 32,
+    "batch_size" : 16,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "summary_interval": 100,
-    "histogram_interval": 100,
-    "num_epochs": 50,
+    "summary_interval": 1000,
+    "histogram_interval": 1000,
+    "num_epochs": 30,
+    "patience": 8,
     "cuda_device": CUDA,
-    "num_serialized_models_to_keep": 5,
+    "num_serialized_models_to_keep": 1,
     "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",

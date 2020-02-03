@@ -22,7 +22,21 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "teacher_force_ratio": 1.0,
+    "salience_source_mixer":{
+      "type": "bilinear_attn",
+      "embedding_size": EMBEDDING,
+      "feature_size": FEATURE,
+      "k_size": EMBEDDING,
+      "c_size": EMBEDDING,
+      "p_size": EMBEDDING*2,
+      "glimpse" : 4,
+      "salience_embedder": {
+        "embedding_size": EMBEDDING,
+        "feature_size": FEATURE,
+        "type": "matrix",
+      },
+    },
+    "teacher_force_ratio": 0.7,
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
@@ -55,15 +69,16 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 32,
+    "batch_size" : 16,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "summary_interval": 100,
-    "histogram_interval": 100,
-    "num_epochs": 50,
+    "summary_interval": 1000,
+    "histogram_interval": 1000,
+    "num_epochs": 30,
+    "patience": 8,
     "cuda_device": CUDA,
-    "num_serialized_models_to_keep": 5,
+    "num_serialized_models_to_keep": 1,
     "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",

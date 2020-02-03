@@ -18,7 +18,7 @@ class SalienceSourceMixer(Module, Registrable):
         self.salience_embedder = salience_embedder
 
 
-@SalienceSourceMixer.register('linear_concat')
+@SalienceSourceMixer.register('emb_mlp')
 class LinearConcat(SalienceSourceMixer, Registrable):
     def __init__(self, embedding_size: int,
                  feature_size: int,

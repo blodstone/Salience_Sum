@@ -7,12 +7,12 @@
 #$ -j y
 #$ -P rse
 #$ -q rse.q
-#$ -o pg_salience_feature_concat_32_dgx.txt
+#$ -o pg_salience_feature_concat_16_dgx.txt
 #$ -wd /home/acp16hh/Salience_Sum
 git checkout dev
-MODEL=/data/acp16hh/Exp_Gwen_Saliency/pg_salience_feature/concat_32_dgx
+MODEL=/data/acp16hh/Exp_Gwen_Saliency/pg_salience_feature/emb_mlp_16
 module load apps/python/conda
 module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
 source activate gwen
 
-allennlp train -s $MODEL -f --file-friendly-logging --include-package pg_salience_feature HPC/dgx/pg_salience_feature/pg_salience_feature_concat_32.jsonnet
+allennlp train -s $MODEL -f --file-friendly-logging --include-package pg_salience_feature HPC/dgx/pg_salience_feature/pg_salience_emb_mlp_16.jsonnet
