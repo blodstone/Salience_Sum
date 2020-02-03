@@ -1,5 +1,6 @@
 from typing import Optional, Iterable, List
 
+import numpy
 import numpy as np
 from allennlp.data import DatasetReader, Instance, Token
 from allennlp.data.fields import TextField, ArrayField, MetadataField
@@ -110,6 +111,6 @@ class SummDataReader(DatasetReader):
             else:
                 salience_seq = [seq for seq in zip(*salience_seq)][:self._source_max_tokens]
                 salience_field = ArrayField(
-                    np.array(salience_seq[:self._source_max_tokens]), padding_value=-1)
+                    np.array(salience_seq[:self._source_max_tokens]), padding_value=0, dtype=numpy.long)
             output_field['salience_values'] = salience_field
         return Instance(output_field)

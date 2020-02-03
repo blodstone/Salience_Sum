@@ -18,6 +18,7 @@ from pg_salience_feature.module.encoder import Encoder
 
 # noinspection DuplicatedCode
 from pg_salience_feature.module.salience_embedder import SalienceEmbedder
+from pg_salience_feature.module.salience_src_combine import SalienceSourceMixer
 
 
 @Model.register("enc_dec_salience_feature")
@@ -28,17 +29,15 @@ class EncoderDecoder(Model):
                  target_embedder: TextFieldEmbedder,
                  coverage_lambda: float,
                  max_steps: int,
-                 salience_embedder: SalienceEmbedder,
+                 salience_source_mixer: SalienceSourceMixer,
                  encoder: Encoder,
                  decoder: Decoder,
                  vocab: Vocabulary,
-                 salience_mode: str,
                  teacher_force_ratio: float,
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
         # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
-        self.salience_embedder = salience_embedder
-        self.salience_mode = salience_mode
+        self.salience_source_mixer = salience_source_mixer
         self.coverage_lambda = coverage_lambda
         if coverage_lambda == 0.0:
             self.is_coverage = False
@@ -205,17 +204,7 @@ class EncoderDecoder(Model):
         :return: All the states and the last state
         """
         state = self.init_enc_state(source_tokens)
-        batch_size = salience_values.size(0)
-        seq_size = salience_values.size(1)
-        feature_size = salience_values.size(2)
-        # (Batch, Seq, Emb Dim)
-        embedded_src = self.source_embedder(source_tokens)
-        exp_salience_values = salience_values.unsqueeze(3).expand((batch_size, seq_size, feature_size, feature_size))
-        # (Batch, Seq, # Feature, One Hot)
-        exp_salience_values = exp_salience_values * torch.eye(feature_size, feature_size)
-        emb_salience_values = self.salience_embedder(exp_salience_values)
-        emb_salience_value = emb_salience_values.mean(dim=2)
-        embedded_src = torch.cat([embedded_src, emb_salience_value], dim=2)
+        embedded_src = self.salience_source_mixer(salience_values, self.source_embedder(source_tokens))
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \
             self.encoder(embedded_src, state['source_lengths'])

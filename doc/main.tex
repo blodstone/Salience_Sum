@@ -75,13 +75,13 @@
     \]
     where:
     \begin{enumerate}
-      \item $\mathbf{f} = \mathbf{P}^\intercal \mathbf{f'}$ \\
+      \item $\mathbf{f}_i = \mathbf{P}^\intercal \mathbf{f'}_i$ \\
       where $\mathbf{P} \in \mathbb{R}^{(K\times E)}$
       \item $\mathbf{f'}_i = \text{BAN}(e_s(x_i), e_z(z_i))$
       \item $\mathbf{f'}_i^k = (e_s(x_i)^\intercal \mathbf{U}')^\intercal_k\mathcal{A}(e_z(z_i)^\intercal\mathbf{V}')_k$\\
       where $\mathbf{U}'\in \mathbb{R}^{E\times K}$, $\mathbf{V}' \in \mathbb{R}^{f\times K}$,$(e_s(x_i)^\intercal \mathbf{U}') \in \mathbb{R}$ and $(e_z(z_i)^\intercal\mathbf{V}')\in\mathbb{R}^f$
       \item $\mathcal{A} = \text{softmax} ((((\mathds{1}\cdot \mathbf{p}^\intercal)\circ\, e_s(x_i)^\intercal \mathbf{U})(\mathbf{V}^\intercal e_z(z_i)))$ \\
-      where $\mathbf{p}\in\mathbb{R}^K$
+      where $\mathbf{p}\in\mathbb{R}^K$ and $\mathds{1}\in\mathbb{R}$
     \end{enumerate}
 
   \end{enumerate}

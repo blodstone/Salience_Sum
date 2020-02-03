@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1580731215 "main.tex" "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/doc/main.pdf" "main" 1580731215
+["pdflatex"] 1580732647 "main.tex" "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/doc/main.pdf" "main" 1580732647
   "/etc/texmf/web2c/texmf.cnf" 1549324542 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/doc/main.aux" 1580731215 1708 4663ad7fade58620f250e52dde0f3714 ""
+  "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/doc/main.aux" 1580732647 1708 4663ad7fade58620f250e52dde0f3714 ""
   "/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc" 1480098666 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1511824771 3332 103109f5612ad95229751940c61aada0 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1480098689 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -72,8 +72,8 @@
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1549324617 2700761 ac0584cc9514ab21918550a6948c4ee2 ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1549324626 4139997 dd9a6db2ab60e0107cf040d8e550b2e0 ""
   "arxiv.sty" 1577203407 7602 540b8d31efa75216211145c8b64c810c ""
-  "main.aux" 1580731215 1708 4663ad7fade58620f250e52dde0f3714 ""
-  "main.tex" 1580731214 11307 b833556b3dd5d7eeefe12f6d9b22d2b4 ""
+  "main.aux" 1580732647 1708 4663ad7fade58620f250e52dde0f3714 ""
+  "main.tex" 1580732647 11341 74a1a163f857886e0f853c5f28a00afb ""
   (generated)
   "main.aux"
   "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/doc/main.log"
