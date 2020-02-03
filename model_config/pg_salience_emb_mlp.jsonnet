@@ -12,8 +12,8 @@ local CUDA=0;
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "/data/acp16hh/data/bbc/ready/all/train.concat.tsv",
-  "validation_data_path": "/data/acp16hh/data/bbc/ready/all/validation.concat.tsv",
+  "train_data_path": "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc/ready/all/train.concat.tsv",
+  "validation_data_path": "/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum/data/bbc/ready/all/validation.concat.tsv",
   "model": {
     "type": "enc_dec_salience_feature",
     "encoder": {
