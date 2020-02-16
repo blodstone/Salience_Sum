@@ -21,7 +21,7 @@ def rouge(cand, ref):
             os.mkdir(tmp_dir + "/reference")
         candidates = [line.strip() for line in cand]
         references = [line.strip().split('\t')[1] for line in ref if line.strip() != '']
-        assert len(candidates) == len(references)
+        assert len(candidates) == len(references), f'{len(candidates)}, {len(references)}'
         cnt = len(candidates)
         for i in range(cnt):
             if len(references[i]) < 1:
