@@ -54,9 +54,10 @@ def process_doc(line):
     src_seq = ' '.join(collection_seq[0])
     salience_seqs = [[float(value) for value in seq] for seq in collection_seq[1:]]
     doc = segmenter(src_seq)
-    sum_t_tensor = torch.zeros(1, 768)
+
     j = 0
     sent_nlps = []
+    t_tensors = []
     for sent in doc.sents:
         sent_nlp = nlp(sent.text)
         sent_nlps.append(sent_nlp)
@@ -64,26 +65,34 @@ def process_doc(line):
             sent_nlp_tensor = from_dlpack(sent_nlp.tensor.toDlpack())
         else:
             sent_nlp_tensor = torch.tensor(sent_nlp.tensor)
-        for salience_model in salience_seqs:
+        t_tensor = torch.zeros(len(salience_seqs), sent_nlp_tensor.size(1))
+        for idx, salience_model in enumerate(salience_seqs):
             token_j = j
+            model_tensor = torch.zeros(1, sent_nlp_tensor.size(1))
             for i, token in enumerate(sent_nlp):
-                if not token.is_stop:
-                    sum_t_tensor += sent_nlp_tensor[i, :] * salience_model[j]
-                    token_j += 1
+                if salience_model[token_j] == 1.0:
+                    model_tensor += sent_nlp_tensor[i, :] * salience_model[token_j]
+                token_j += 1
+            model_tensor = model_tensor / sum(salience_model)
+            t_tensor[idx, :] = model_tensor
         j = token_j
+        t_tensors.append(t_tensor)
     doc_sims = []
-    for sent_nlp in sent_nlps:
+    for idx, sent_nlp in enumerate(sent_nlps):
+        t_tensor = t_tensors[idx]
         if is_using_gpu:
-            sent_nlp_tensor = from_dlpack(sent_nlp.tensor.toDlpack())
+            src_tensor = from_dlpack(sent_nlp.tensor.toDlpack())
         else:
-            sent_nlp_tensor = torch.tensor(sent_nlp.tensor)
-        sent_sims = []
-        for t in sent_nlp_tensor.split(1, 0):
-            similarity = t.squeeze().dot(sum_t_tensor.squeeze())
-            sent_sims.append(similarity.item())
-        doc_sims.append(sent_sims)
-    means = [statistics.mean(sims) for sims in doc_sims]
-    sent_idx = [(i, j, len(list(doc.sents)[i])) for i, j in enumerate(means)]
+            src_tensor = torch.tensor(sent_nlp.tensor)
+        result_tensor = torch.zeros(src_tensor.size(0), t_tensor.size(0))
+        for i, s in enumerate(src_tensor.split(1, 0)):
+            for j, t in enumerate(t_tensor.split(1, 0)):
+                result_tensor[i, j] = s.squeeze().dot(t.squeeze())
+        recall = result_tensor.max(dim=0)[0].sum() / t_tensor.size(0)
+        precision = result_tensor.max(dim=1)[0].sum() / src_tensor.size(0)
+        f1 = 2 * (recall * precision) / (recall + precision)
+        doc_sims.append(f1.item())
+    sent_idx = [(i, j, len(list(doc.sents)[i])) for i, j in enumerate(doc_sims)]
     sent_idx.sort(key=lambda x: x[1], reverse=True)
     summ = ''
     for i, _, l in sent_idx:

@@ -60,10 +60,10 @@ def rouge_results_to_str(results_dict):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', type=str, default="candidate.tsv",
-                        help='candidate file (TSV format)')
-    parser.add_argument('-r', type=str, default="reference.txt",
-                        help='reference file (TXT format)')
+    parser.add_argument('-c', type=str, default="candidate.txt",
+                        help='candidate file (TXT format)')
+    parser.add_argument('-r', type=str, default="reference.tsv",
+                        help='reference file (TSV format)')
     args = parser.parse_args()
     if args.c.upper() == "STDIN":
         candidates = sys.stdin
