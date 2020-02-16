@@ -54,7 +54,8 @@ def process_doc(line):
     if args.dataset == 'CNN':
         # Remove tag
         p = re.compile('(?<=<t>)(.*?)(?=</t>)')
-        tgt_seq = ''.join(p.findall(tgt_seq)).strip()
+        all = [sent.strip() for sent in p.findall(tgt_seq)]
+        tgt_seq = ' '.join(all)
     doc = nlp(src_seq)
     tgt = nlp(tgt_seq)
     # Assuming 1 sentence gold summary for each document (BBC only).
