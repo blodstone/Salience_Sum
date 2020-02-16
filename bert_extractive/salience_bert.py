@@ -64,9 +64,9 @@ def process_doc(line):
             sent_nlp_tensor = from_dlpack(sent_nlp.tensor.toDlpack())
         else:
             sent_nlp_tensor = torch.tensor(sent_nlp.tensor)
-        for i, salience_model in enumerate(salience_seqs):
+        for salience_model in enumerate(salience_seqs):
             token_j = j
-            for token in sent_nlp:
+            for i, token in enumerate(sent_nlp):
                 if not token.is_stop:
                     sum_t_tensor += sent_nlp_tensor[i, :] * salience_model[j]
                     token_j += 1
