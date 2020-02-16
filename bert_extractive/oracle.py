@@ -55,8 +55,6 @@ def process_doc(line):
         # Remove tag
         p = re.compile('(?<=<t>)(.*?)(?=</t>)')
         tgt_seq = ''.join(p.findall(tgt_seq)).strip()
-    collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
-    src_seq = ' '.join(collection_seq[0])
     doc = nlp(src_seq)
     tgt = nlp(tgt_seq)
     # Assuming 1 sentence gold summary for each document (BBC only).
