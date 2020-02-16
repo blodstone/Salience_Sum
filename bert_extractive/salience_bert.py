@@ -65,6 +65,8 @@ def process_doc(line):
         else:
             sent_nlp_tensor = torch.tensor(sent_nlp.tensor)
         t_tensor = torch.zeros(len(salience_seqs), sent_nlp_tensor.size(1))
+        if args.sal_idx != -1:
+            salience_seqs = salience_seqs[args.sal_idx:args.sal_idx]
         for idx, salience_model in enumerate(salience_seqs):
             model_tensor = torch.zeros(1, sent_nlp_tensor.size(1))
             for i, token in enumerate(sent):
@@ -103,12 +105,14 @@ def main():
     output_path = Path(args.output)
     lines = input_path.open('r').readlines()
     summs = read_text(lines)
-    (output_path / 'salience_out.txt').write_text('\n'.join(summs))
+    (output_path / f'{args.output_name}-{args.sal_idx}.txt').write_text('\n'.join(summs))
 
 
 if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-input', help='The input text file (tsv).')
     parse.add_argument('-output', help='The output path.')
+    parse.add_argument('-sal_idx', help='Salience index. -1 for all.', type=int)
+    parse.add_argument('-output_name', help='The output file name.')
     args = parse.parse_args()
     main()
