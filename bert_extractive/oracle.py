@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import statistics
+import re
 import spacy
 from spacy.lang.en import English
 import torch
@@ -50,9 +51,13 @@ def read_text(lines):
 
 def process_doc(line):
     src_seq, tgt_seq = line.split('\t')
+    if args.dataset == 'CNN':
+        # Remove tag
+        p = re.compile('(?<=<t>)(.*?)(?=</t>)')
+        tgt_seq = ''.join(p.findall(tgt_seq)).strip()
     collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
     src_seq = ' '.join(collection_seq[0])
-    doc = segmenter(src_seq)
+    doc = nlp(src_seq)
     tgt = nlp(tgt_seq)
     # Assuming 1 sentence gold summary for each document (BBC only).
     # For CNN/DM, it will need to be rewrote
@@ -63,7 +68,7 @@ def process_doc(line):
     doc_sims = []
     for sent in doc.sents:
         # We re-parse each sentence to limit the context to the sentence.
-        src = nlp(sent.text)
+        src = sent
         if is_using_gpu:
             src_tensor = from_dlpack(src.tensor.toDlpack())
         else:
@@ -76,14 +81,21 @@ def process_doc(line):
         precision = result_tensor.max(dim=1)[0].sum() / src_tensor.size(0)
         f1 = 2 * (recall * precision) / (recall + precision)
         doc_sims.append(f1.item())
-    sent_idx = [(i, j, len(list(doc.sents)[i])) for i, j in enumerate(doc_sims)]
+    oracle_summ = []
+
+    sent_idx = [(i, j, len(list(doc.sents)[i]), list(doc.sents)[i].text) for i, j in enumerate(doc_sims)]
     sent_idx.sort(key=lambda x: x[1], reverse=True)
-    oracle_summ = ''
-    for i, _, l in sent_idx:
-        if l <= 100:
-            oracle_summ = list(doc.sents)[i].text
+    len_sum = 0
+    max_len = 100
+    for i, _, l, text in sent_idx:
+        if len_sum + l <= max_len:
+            oracle_summ.append(text)
+            len_sum += l
+            if args.dataset == 'BBC':
+                break
+        else:
             break
-    return oracle_summ
+    return ' '.join(oracle_summ)
 
 
 def main():
@@ -91,12 +103,13 @@ def main():
     output_path = Path(args.output)
     lines = input_path.open('r').readlines()
     oracle_summs = read_text(lines)
-    (output_path / 'oracle.txt').write_text('\n'.join(oracle_summs))
+    (output_path / f'oracle-{args.dataset}.txt').write_text('\n'.join(oracle_summs))
 
 
 if __name__ == '__main__':
     parse = argparse.ArgumentParser()
     parse.add_argument('-input', help='The input text file (tsv).')
     parse.add_argument('-output', help='The output path.')
+    parse.add_argument('-dataset', help='BBC or CNN/DM')
     args = parse.parse_args()
     main()
