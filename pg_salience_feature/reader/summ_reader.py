@@ -35,7 +35,7 @@ class SummDataReader(DatasetReader):
         if self._use_salience:
             collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
             src_seq = collection_seq[0]
-            salience_seqs = [[float(value) for value in seq] for seq in collection_seq[1:]]
+            salience_seqs = [[float(value) if float(value) <= 1.0 else 1.0 for value in seq] for seq in collection_seq[1:]]
             return_res.append([Token(token) for token in src_seq])
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
