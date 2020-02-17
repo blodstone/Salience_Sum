@@ -34,11 +34,12 @@ class SalienceEmbedderVector(SalienceEmbedder):
 
     def __init__(self, embedding_size: int, feature_size: int):
         super().__init__(embedding_size, feature_size)
-        self.embedders = Embedding(pow(2, self.feature_size) - 1, self.embedding_size)
+        self.embedders = Embedding(pow(2, self.feature_size), self.embedding_size)
 
     def forward(self, salience_values: torch.Tensor):
         embs = torch.zeros(salience_values.size(0), salience_values.size(1), 1,
                            device=salience_values.device, dtype=torch.long)
-        for i, salience_value in enumerate(salience_values.split(1, 2)):
-            embs += (pow(2, i) - 1) * salience_value
+        sum_salience_values = salience_values.sum(dim=2)
+        for i, salience_value in enumerate(sum_salience_values.unsqueeze(2).split(1, 2)):
+            embs += pow(2, salience_value) - 1
         return self.embedders(embs).squeeze()
