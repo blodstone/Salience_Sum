@@ -10,7 +10,7 @@ class TestPGSalienceConcatModel:
 
     def test_run(self, model: Callable[[Path, Dict, Path], ModelTestCase],
                    shared_datadir: Path, datadir: Path):
-        param_file = shared_datadir / 'model_config' / 'pg_salience_concat.jsonnet'
+        param_file = shared_datadir / 'model_config' / 'pg_salience_emb_mlp_.jsonnet'
         dataset_file = {
             'train': '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/train.concat.tsv',
             'validation': '/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/validation.concat.tsv'
