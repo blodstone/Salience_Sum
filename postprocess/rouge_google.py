@@ -59,7 +59,7 @@ if __name__ == "__main__":
     #     candidates = sys.stdin
     # else:
     #     candidates = codecs.open(args.c, encoding="utf-8")
-    references = codecs.open(args.r, encoding="utf-8")
+    references = codecs.open(args.r, encoding="utf-8").readlines()
     input_folder = Path(args.f)
     results = ['R1_p, R2_p, RL_p, R1_r, R2_r, RL_r, R1_f, R2_f, RL_f']
     for i in input_folder.iterdir():
