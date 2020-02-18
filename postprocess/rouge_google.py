@@ -65,7 +65,7 @@ if __name__ == "__main__":
     for i in input_folder.iterdir():
         print(f'Processing file {str(i)}')
         candidates = i.open().readlines()
-        results.append([f'{str(i)}'])
+        results.append(f'{str(i)}')
         results.append(rouge(candidates, references))
     output_path = Path(args.o)
     (output_path / args.n).open('w').write('\n'.join(results))
