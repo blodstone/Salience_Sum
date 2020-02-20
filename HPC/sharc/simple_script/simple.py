@@ -7,4 +7,4 @@ import sys
 
 n = sys.argv[1]
 time.sleep(30)
-open(f'simple_{n}.csv').write(f'{n}')
+open(f'simple_{n}.csv', 'w').write(f'{n}')

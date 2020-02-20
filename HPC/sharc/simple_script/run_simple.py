@@ -22,7 +22,7 @@ def main():
             result = list(open(f'simple_{i}.csv').readlines())[0]
             output.append(result)
         s.deleteJobTemplate(jt)
-        open('all_output.csv').write('\n'.join(output))
+        open('all_output.csv', 'w').write('\n'.join(output))
 
 if __name__ == '__main__':
     main()
