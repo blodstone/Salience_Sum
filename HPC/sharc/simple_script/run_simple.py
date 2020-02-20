@@ -17,10 +17,9 @@ def main():
             jobid = s.runJob(jt)
             print(f'Your job {str(i)} has been submitted with id {jobid}')
             jobids[jobid] = i
+        s.synchronize(list(jobids.keys()), drmaa.Session.TIMEOUT_WAIT_FOREVER, True)
         for jobid, i in jobids.items():
-            retval = s.wait(jobid, drmaa.Session.TIMEOUT_WAIT_FOREVER)
             result = list(open(f'simple_{i}.csv').readlines())[0]
-            print(f'{retval.jobId} has finished with status {retval.hasExited}')
             output.append(result)
         s.deleteJobTemplate(jt)
         open('all_output.csv').write('\n'.join(output))
