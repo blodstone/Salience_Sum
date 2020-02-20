@@ -6,5 +6,6 @@ import time
 import sys
 
 n = sys.argv[1]
+print(n)
 time.sleep(30)
 open(f'simple_{n}.csv', 'w').write(f'{n}')
