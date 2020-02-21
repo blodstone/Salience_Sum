@@ -1,9 +1,5 @@
 # -*- encoding: utf-8 -*-
 import argparse
-import os
-import time
-import shutil
-import sys
 import codecs
 from pathlib import Path
 
@@ -15,16 +11,10 @@ def get_mean(all_scores, rouge_type):
     mean_recall = sum([score.recall for score in scores]) / len(scores)
     mean_precision = sum([score.precision for score in scores]) / len(scores)
     mean_fmeasure = sum([score.fmeasure for score in scores]) / len(scores)
-    return mean_precision, mean_recall, mean_fmeasure
+    return [mean_precision, mean_recall, mean_fmeasure]
 
 
-def send_to_file(result):
-    to_file = f'Precision,{result[0]}\nRecall,{result[1]}\nF1,{result[2]}'
-    output = Path(args.o)
-
-
-
-def rouge(cand, ref):
+def rouge(cand, ref, name):
     """Calculate ROUGE scores of sequences passed as an iterator
        e.g. a list of str, an open file, StringIO or even sys.stdin
     """
@@ -36,13 +26,14 @@ def rouge(cand, ref):
     for c, r in zip(candidates, references):
         scores = scorer.score(r, c)
         all_scores.append(scores)
-    results_1 = get_mean(all_scores, 'rouge1')
-    results_2 = get_mean(all_scores, 'rouge2')
-    results_l = get_mean(all_scores, 'rougeL')
-    result_str = ''
-    for p_1, p_2, p_f in zip(results_1, results_2, results_l):
-        result_str = '{}\n{:.2%},{:.2%},{:.2%}'.format(result_str, p_1, p_2, p_f)
-    return result_str
+    results = []
+    results.extend(get_mean(all_scores, 'rouge1'))
+    results.extend(get_mean(all_scores, 'rouge2'))
+    results.extend(get_mean(all_scores, 'rougeL'))
+    result_str = [name]
+    for value in results:
+        result_str.append('{:.2%}'.format(value))
+    return ','.join(result_str)
 
 
 if __name__ == "__main__":
@@ -61,11 +52,10 @@ if __name__ == "__main__":
     #     candidates = codecs.open(args.c, encoding="utf-8")
     references = codecs.open(args.r, encoding="utf-8").readlines()
     input_folder = Path(args.f)
-    results = ['R1_p, R2_p, RL_p, R1_r, R2_r, RL_r, R1_f, R2_f, RL_f']
-    for i in input_folder.iterdir():
-        print(f'Processing file {str(i)}')
-        candidates = i.open().readlines()
-        results.append(f'{str(i)}')
-        results.append(rouge(candidates, references))
+    results = ['Name, R1_p, R1_r, R1_f, R2_p, R2_r, R2_f, RL_p, RL_r, RL_f']
+    for f in input_folder.iterdir():
+        print(f'Processing file {f.stem}')
+        candidates = f.open().readlines()
+        results.append(rouge(candidates, references, f.stem))
     output_path = Path(args.o)
     (output_path / args.n).open('w').write('\n'.join(results))

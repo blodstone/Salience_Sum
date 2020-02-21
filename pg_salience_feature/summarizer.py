@@ -12,7 +12,7 @@ from pg_salience_feature import SummDataReader, Seq2SeqPredictor
 
 def summarize(input, vocab_path, model, model_config, output_path, batch_size, cuda):
     input_file = Path(input)
-    output_file = Path(output_path) / f'{input_file.stem}.out'
+    output_file = Path(output_path)
     if output_file.exists():
         print('Output file already exists. Deleting it.')
         os.remove(str(output_file))
