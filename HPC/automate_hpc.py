@@ -103,6 +103,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sharc', help='Run script for sharc only.', action='store_true')
     parser.add_argument('--dgx', help='Run script for dgx only.', action='store_true')
+    parser.add_argument('--all', help='Run script for dgx only.', action='store_true')
     parser.add_argument('-spec_file', help='Path to spec file.')
     args = parser.parse_args()
     main()
