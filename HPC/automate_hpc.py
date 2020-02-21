@@ -51,7 +51,7 @@ def create_sh(mode):
             file_path.write_text(output_str)
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
-        job_file = (output_path / 'jobs_dgx.sh')
+        job_file = (output_path / 'jobs_sharc.sh')
         job_file.write_text('sh $1/script_sharc_$SGE_TASK_ID')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
