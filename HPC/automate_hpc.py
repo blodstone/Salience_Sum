@@ -63,7 +63,7 @@ def create_sh(mode):
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
         job_file = (output_path / 'jobs_dgx.sh')
-        job_file.write_text('sh $1/script_dgx_$SGE_TASK_ID')
+        job_file.write_text('#!/bin/bash\n"$1/script_dgx_$SGE_TASK_ID"')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
     return server_output
@@ -90,7 +90,7 @@ def build_run_job(s, mode, last_i):
     jt.args = [(output_path / mode)]
     jt.blockEmail = False
     jt.email = ['hhardy2@sheffield.ac.uk']
-    jt.remoteCommand = (output_path / f'jobs_{mode}.sh')
+    jt.remoteCommand = str(output_path / f'jobs_{mode}.sh')
     if mode == 'sharc':
         jt.nativeSpecification = '-P gpu gpu=1 -l rmem=48G -l h_rt=96:00:00 -wd /home/acp16hh/Salience_Sum'
     elif mode == 'dgx':
@@ -103,7 +103,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sharc', help='Run script for sharc only.', action='store_true')
     parser.add_argument('--dgx', help='Run script for dgx only.', action='store_true')
-    parser.add_argument('--all', help='Run script for dgx only.', action='store_true')
     parser.add_argument('-spec_file', help='Path to spec file.')
     args = parser.parse_args()
     main()
