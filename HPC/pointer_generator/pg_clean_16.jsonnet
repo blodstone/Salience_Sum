@@ -1,42 +1,29 @@
 local HIDDEN=512;
 local EMBEDDING=128;
-local FEATURE=6;
 local CUDA=0;
 {
   "dataset_reader": {
-    "type": "summdatareader_salience_feature",
+    "type": "summdatareader_salience",
     "lazy": false,
     "interpolation": false,
     "predict": false,
-    "use_salience": true,
+    "use_salience": false,
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "/data/acp16hh/data/bbc/ready/all/train.concat.tsv",
-  "validation_data_path": "/data/acp16hh/data/bbc/ready/all/validation.concat.tsv",
+  "train_data_path": "/data/acp16hh/data/bbc/ready/clean/train.tsv",
+  "validation_data_path": "/data/acp16hh/data/bbc/ready/clean/validation.tsv",
   "model": {
-    "type": "enc_dec_salience_feature",
+    "type": "encoder_decoder_salience",
     "encoder": {
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
       "num_layers": 1,
       "bidirectional": true
     },
-    "salience_source_mixer":{
-      "type": "bilinear_attn",
-      "embedding_size": EMBEDDING,
-      "feature_size": FEATURE,
-      "k_size": EMBEDDING,
-      "c_size": EMBEDDING,
-      "p_size": EMBEDDING*2,
-      "glimpse" : 4,
-      "salience_embedder": {
-        "embedding_size": EMBEDDING,
-        "feature_size": FEATURE,
-        "type": "matrix",
-      },
-    },
     "teacher_force_ratio": 0.7,
+    "coverage_lambda": 0.0,
+    "salience_lambda": 0.0,
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
@@ -45,7 +32,10 @@ local CUDA=0;
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
     },
-    "coverage_lambda": 0.0,
+    "salience_predictor": {
+      "hidden_size": HIDDEN,
+      "bidirectional": true,
+    },
     "max_steps": 100,
     "source_embedder": {
       "token_embedders": {
@@ -73,12 +63,12 @@ local CUDA=0;
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "summary_interval": 1000,
+    "summary_interval": 500,
     "histogram_interval": 1000,
-    "num_epochs": 35,
+    "num_epochs": 30,
     "patience": 8,
     "cuda_device": CUDA,
-    "num_serialized_models_to_keep": 1,
+    "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",

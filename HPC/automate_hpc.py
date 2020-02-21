@@ -47,7 +47,7 @@ def create_sh(mode):
     if mode == 'sharc' or mode == 'all':
         for i, output_str in enumerate(server_output['sharc']):
             (output_path / 'sharc').mkdir(parents=True, exist_ok=True)
-            file_path = (output_path / 'sharc' / f'script_{str(i)}.sh')
+            file_path = (output_path / 'sharc' / f'script_{str(i+1)}.sh')
             file_path.write_text(output_str)
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
@@ -58,7 +58,7 @@ def create_sh(mode):
     if mode == 'dgx' or mode == 'all':
         for i, output_str in enumerate(server_output['dgx']):
             (output_path / 'dgx').mkdir(parents=True, exist_ok=True)
-            file_path = (output_path / 'dgx' / f'script_{str(i)}.sh')
+            file_path = (output_path / 'dgx' / f'script_{str(i+1)}.sh')
             file_path.write_text(output_str)
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
@@ -95,7 +95,7 @@ def build_run_job(s, mode, last_i):
         jt.nativeSpecification = '-P gpu gpu=1 -l rmem=48G -l h_rt=96:00:00 -wd /home/acp16hh/Salience_Sum'
     elif mode == 'dgx':
         jt.nativeSpecification = '-P rse -q rse.q -P gpu -l gpu=1 -l rmem=48G -l h_rt=96:00:00 -wd /home/acp16hh/Salience_Sum'
-    s.runBulkJobs(jt, 0, last_i, 1)
+    s.runBulkJobs(jt, 1, last_i, 1)
     s.deleteJobTemplate(jt)
 
 
