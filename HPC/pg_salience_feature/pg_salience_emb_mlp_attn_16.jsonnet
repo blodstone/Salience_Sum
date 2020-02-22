@@ -26,17 +26,13 @@ local CUDA=0;
       "bidirectional": true
     },
     "salience_source_mixer":{
-      "type": "bilinear_attn",
+      "type": "emb_mlp",
       "embedding_size": EMBEDDING,
       "feature_size": FEATURE,
-      "k_size": EMBEDDING,
-      "c_size": EMBEDDING,
-      "p_size": EMBEDDING*2,
-      "glimpse" : 4,
       "salience_embedder": {
         "embedding_size": EMBEDDING,
         "feature_size": FEATURE,
-        "type": "matrix",
+        "type": "vector",
       },
     },
     "teacher_force_ratio": 0.7,
@@ -47,7 +43,7 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
-      "is_emb_attention": false,
+      "is_emb_attention": true,
       "emb_attention_mode": "mlp",
     },
     "coverage_lambda": 0.0,
@@ -80,7 +76,7 @@ local CUDA=0;
   "trainer": {
     "summary_interval": 1000,
     "histogram_interval": 1000,
-    "num_epochs": 35,
+    "num_epochs": 30,
     "patience": 8,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 1,

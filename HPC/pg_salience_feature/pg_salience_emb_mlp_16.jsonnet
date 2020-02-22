@@ -43,6 +43,8 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
+      "is_emb_attention": false,
+      "emb_attention_mode": "mlp",
     },
     "coverage_lambda": 0.0,
     "max_steps": 100,

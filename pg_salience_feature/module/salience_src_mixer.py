@@ -16,6 +16,16 @@ class SalienceSourceMixer(Module, Registrable):
         self.feature_size = feature_size
         self.embedding_size = embedding_size
         self.salience_embedder = salience_embedder
+        self.linear_salience = Linear(self.hidden_size,
+                                      self.hidden_size * 2,
+                                      bias=False)
+
+
+@SalienceSourceMixer.register('no_mix')
+class NoMix(SalienceSourceMixer, Registrable):
+    def forward(self, salience_values, embedded_src):
+        emb_salience_value = self.salience_embedder(salience_values)
+        return embedded_src, self.linear_salience(emb_salience_value)
 
 
 @SalienceSourceMixer.register('emb_mlp')
@@ -33,7 +43,7 @@ class LinearConcat(SalienceSourceMixer, Registrable):
     def forward(self, salience_values, embedded_src):
         emb_salience_value = self.salience_embedder(salience_values)
         embedded_src = torch.cat([embedded_src, emb_salience_value], dim=2)
-        return self.linear(embedded_src)
+        return self.linear(embedded_src), self.linear_salience(emb_salience_value)
 
 
 # noinspection PyArgumentList
@@ -81,7 +91,6 @@ class BilinearAttention(SalienceSourceMixer, Registrable):
         f_ = torch.stack(result, dim=1).squeeze(2)
         return self.F(f_.view(-1, f_.size(2), f_.size(1)))
 
-
     def forward(self, salience_values, emb_src):
         batch_size = salience_values.size(0)
         length = salience_values.size(1)
@@ -97,5 +106,4 @@ class BilinearAttention(SalienceSourceMixer, Registrable):
         for i in range(1, self.glimpse):
             A = self.bilinear_attn_map(i, emb_salience, emb_src)
             f = self.bilinear_attn_net(f, t2, A) + f
-        return f.view(batch_size, length, -1)
-
+        return f.view(batch_size, length, -1), self.linear_salience(emb_salience)

@@ -18,7 +18,7 @@ from pg_salience_feature.module.encoder import Encoder
 
 # noinspection DuplicatedCode
 from pg_salience_feature.module.salience_embedder import SalienceEmbedder
-from pg_salience_feature.module.salience_src_combine import SalienceSourceMixer
+from pg_salience_feature.module.salience_src_mixer import SalienceSourceMixer
 
 
 @Model.register("enc_dec_salience_feature")
@@ -204,15 +204,19 @@ class EncoderDecoder(Model):
         :return: All the states and the last state
         """
         state = self.init_enc_state(source_tokens)
-        embedded_src = self.salience_source_mixer(salience_values, self.source_embedder(source_tokens))
+        embedded_src, emb_salience_feature = self.salience_source_mixer(salience_values, self.source_embedder(source_tokens))
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \
             self.encoder(embedded_src, state['source_lengths'])
         batch_size = states.size(0)
         state['encoder_states'] = states  # (B, L, Num Direction * D_h)
-        state['hidden'] = final_state.view(batch_size, final_state.size(0), final_state.size(2))  # (B, L, Num Direction * D_h)
+        state['hidden'] = final_state.view(
+            batch_size,
+            final_state.size(0),
+            final_state.size(2))  # (B, L, Num Direction * D_h)
         state['context'] = final_context_state.view(batch_size, final_context_state.size(0), final_context_state.size(2))  # (B, L, Num Direction * D_h)
         state['states_features'] = states_features  # (B, L, Num Direction * D_h)
+        state['emb_salience_feature'] = emb_salience_feature  # (B, L, EmbDim)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state
 

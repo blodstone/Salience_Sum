@@ -55,12 +55,15 @@ class Decoder(Module, Registrable):
                 is_coverage: bool,
                 is_training: bool = True,
                 is_first_step: bool = False,
+                is_emb_attention: bool = False,
+                emb_attention_mode: str = 'mlp',
                 ):
         input_feed = state['input_feed']
         source_ids = state['source_ids']
         max_oov = state['max_oov']
         states = state['encoder_states']
         states_features = state['states_features']
+        emb_salience_feature = state['emb_salience_feature']
         hidden = state['hidden']
         context = state['context']
         source_mask = state['source_mask']
@@ -75,8 +78,12 @@ class Decoder(Module, Registrable):
                                       context.view(1, batch_size, hidden.size(2))))
         if self.is_attention:
             # Attention step 0 to calculate coverage step 1
-            decoder_output, coverage, attention = self.attention(
-                rnn_output, states, states_features, source_mask, coverage, is_coverage)
+            decoder_output, coverage, attention = \
+                self.attention(
+                    rnn_output, states, states_features,
+                    source_mask, coverage, is_coverage,
+                    emb_salience_feature, is_emb_attention, emb_attention_mode
+                )
             input_feed = decoder_output
         else:
             input_feed = rnn_output

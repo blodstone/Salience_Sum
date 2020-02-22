@@ -1,0 +1,6 @@
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,dgx,bbc,100
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,dgx,bbc,200
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,dgx,bbc,300
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,100
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,200
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,300

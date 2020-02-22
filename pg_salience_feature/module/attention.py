@@ -25,7 +25,11 @@ class Attention(Module, Registrable):
               states: torch.Tensor,
               states_features: torch.Tensor,
               coverage: torch.Tensor,
-              is_coverage: bool) -> torch.Tensor:
+              is_coverage: bool,
+              emb_salience_feature: torch.Tensor,
+              is_emb_attention: bool,
+              emb_attention_mode: str
+              ) -> torch.Tensor:
         """
         Bahdanau attention
         :param is_coverage:
@@ -49,9 +53,14 @@ class Attention(Module, Registrable):
             coverages_features = self._linear_coverage(coverage)
             total_features = query_features + states_features + coverages_features
         else:
-            total_features = query_features + states_features
+            if is_emb_attention:
+                total_features = query_features + states_features \
+                                 + emb_salience_feature
+            else:
+                total_features = query_features + states_features
         # (B x L_src x 2H)
         alignments = self._v(torch.tanh(total_features))
+        # (B x L_src x 1)
         return alignments
 
     def forward(self,
@@ -60,11 +69,18 @@ class Attention(Module, Registrable):
                 states_features: torch.Tensor,
                 source_mask: torch.Tensor,
                 coverage: torch.Tensor,
-                is_coverage: bool) \
+                is_coverage: bool,
+                emb_salience_feature: torch.Tensor = None,
+                is_emb_attention: bool = False,
+                emb_attention_mode: str = 'mlp',
+                ) \
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Calculating the attention using Bahdanau approach
 
+        :param emb_attention_mode: The mode of embedding (mlp or bilinear)
+        :param is_emb_attention: To use salience embedding in attention or not
+        :param emb_salience_feature: The embedding of salience value ()
         :param is_coverage: To use coverage or not
         :param states_features: Precalculated states features
         :param coverage: The previous coverage (B, L_src, 1)
@@ -74,7 +90,10 @@ class Attention(Module, Registrable):
         :return: The weighted context (B, 1, H)
         """
         # (B, L_tgt, L_src)
-        alignments = self.score(query, states, states_features, coverage, is_coverage)
+        alignments = self.score(query, states, states_features,
+                                coverage, is_coverage,
+                                emb_salience_feature, is_emb_attention, emb_attention_mode
+                                )
         # Set padding to zero
         alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(2), float('-inf'))
         align_vectors = self._softmax(alignments)
