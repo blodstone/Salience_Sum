@@ -12,6 +12,7 @@ import argparse
 def create_sh(mode):
     spec_file = Path(args.spec_file)
     output_path = spec_file.absolute().parents[0]
+    script_name = spec_file.absolute().parents[0].stem
     output_path.mkdir(parents=True, exist_ok=True)
     server_output = {
         'sharc': [],
@@ -63,7 +64,7 @@ def create_sh(mode):
             file_path.write_text(f'#!/bin/bash\n{seed_str}\n{output_str}')
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
-        job_file = (output_path / 'jobs_sharc.sh')
+        job_file = (output_path / f'jobs_{script_name}_sharc.sh')
         job_file.write_text(f'#!/bin/bash\n. {str(output_path)}/sharc/script_$SGE_TASK_ID.sh')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
@@ -75,7 +76,7 @@ def create_sh(mode):
             file_path.write_text(f'#!/bin/bash\n{seed_str}\n{output_str}')
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
-        job_file = (output_path / 'jobs_dgx.sh')
+        job_file = (output_path / f'jobs_{script_name}_dgx.sh')
         job_file.write_text(f'#!/bin/bash\n. {str(output_path)}/dgx/script_$SGE_TASK_ID.sh')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
