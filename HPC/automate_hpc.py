@@ -23,6 +23,8 @@ def create_sh(mode):
     }
     # Eg:pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,dgx,bbc
     for i, line in enumerate(spec_file.open().readlines()):
+        if line.strip() == '':
+            continue
         package, jsonnet, model, server, dataset, random_seed, numpy_seed, pytorch_seed = line.split(',')
         if package == 'pg_salience_feature':
             test = 'test.salience.tsv'
@@ -106,7 +108,7 @@ def build_run_job(s, mode, last_i):
     if mode == 'sharc':
         jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=48G -l h_rt=96:00:00'
     elif mode == 'dgx':
-        jt.nativeSpecification = '-P rse -q rse.q -tc 2 -l gpu=1 -l rmem=48G -l h_rt=96:00:00'
+        jt.nativeSpecification = '-P rse -q rse.q -tc 5 -l gpu=1 -l rmem=48G -l h_rt=96:00:00'
     s.runBulkJobs(jt, 1, last_i, 1)
     s.deleteJobTemplate(jt)
 

@@ -16,6 +16,3 @@ pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,bbc, 300, 300, 300
 pg_salience_feature,pg_salience_bilinear_16.jsonnet,bilinear_16,sharc,bbc, 100, 100, 100
 pg_salience_feature,pg_salience_bilinear_16.jsonnet,bilinear_16,sharc,bbc, 200, 200, 200
 pg_salience_feature,pg_salience_bilinear_16.jsonnet,bilinear_16,sharc,bbc, 300, 300, 300
-
-
-
