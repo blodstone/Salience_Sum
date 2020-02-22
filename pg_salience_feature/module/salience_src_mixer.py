@@ -10,19 +10,29 @@ class SalienceSourceMixer(Module, Registrable):
     def __init__(self,
                  embedding_size: int,
                  feature_size: int,
+                 hidden_size: int,
                  salience_embedder: SalienceEmbedder,
                  ):
         super().__init__()
+        self.hidden_size = hidden_size
         self.feature_size = feature_size
         self.embedding_size = embedding_size
         self.salience_embedder = salience_embedder
-        self.linear_salience = Linear(self.hidden_size,
+        self.linear_salience = Linear(self.embedding_size,
                                       self.hidden_size * 2,
                                       bias=False)
 
 
 @SalienceSourceMixer.register('no_mix')
 class NoMix(SalienceSourceMixer, Registrable):
+    def __init__(self,
+                 embedding_size: int,
+                 feature_size: int,
+                 hidden_size: int,
+                 salience_embedder: SalienceEmbedder,
+                 ):
+        super().__init__(embedding_size, feature_size, hidden_size, salience_embedder)
+
     def forward(self, salience_values, embedded_src):
         emb_salience_value = self.salience_embedder(salience_values)
         return embedded_src, self.linear_salience(emb_salience_value)
@@ -32,8 +42,9 @@ class NoMix(SalienceSourceMixer, Registrable):
 class LinearConcat(SalienceSourceMixer, Registrable):
     def __init__(self, embedding_size: int,
                  feature_size: int,
+                 hidden_size: int,
                  salience_embedder: SalienceEmbedder):
-        super().__init__(embedding_size, feature_size, salience_embedder)
+        super().__init__(embedding_size, feature_size, hidden_size, salience_embedder)
         self.linear = Sequential(
             Linear(2 * embedding_size, 2 * embedding_size, bias=True),
             Tanh(),
@@ -51,12 +62,13 @@ class LinearConcat(SalienceSourceMixer, Registrable):
 class BilinearAttention(SalienceSourceMixer, Registrable):
     def __init__(self, embedding_size: int,
                  feature_size: int,
+                 hidden_size: int,
                  k_size: int,
                  c_size: int,
                  p_size: int,
                  glimpse: int,
                  salience_embedder: SalienceEmbedder):
-        super().__init__(embedding_size, feature_size, salience_embedder)
+        super().__init__(embedding_size, feature_size, hidden_size, salience_embedder)
         self.glimpse = glimpse
         self.k_size = k_size
         self.p_size = p_size

@@ -32,6 +32,7 @@ local CUDA=0;
       "salience_embedder": {
         "embedding_size": EMBEDDING,
         "feature_size": FEATURE,
+        "hidden_size": HIDDEN,
         "type": "vector",
       },
     },

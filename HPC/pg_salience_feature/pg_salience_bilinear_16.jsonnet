@@ -29,6 +29,7 @@ local CUDA=0;
       "type": "bilinear_attn",
       "embedding_size": EMBEDDING,
       "feature_size": FEATURE,
+      "hidden_size": HIDDEN,
       "k_size": EMBEDDING,
       "c_size": EMBEDDING,
       "p_size": EMBEDDING*2,
