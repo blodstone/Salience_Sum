@@ -93,7 +93,7 @@ def build_run_job(s, mode, last_i):
     jt.email = ['hhardy2@sheffield.ac.uk']
     jt.remoteCommand = str(output_path / f'jobs_{mode}.sh')
     if mode == 'sharc':
-        jt.nativeSpecification = '-P gpu gpu=1 -l rmem=48G -l h_rt=96:00:00'
+        jt.nativeSpecification = '-P gpu -l gpu=1 -l rmem=48G -l h_rt=96:00:00'
     elif mode == 'dgx':
         jt.nativeSpecification = '-P rse -q rse.q -P gpu -l gpu=1 -l rmem=48G -l h_rt=96:00:00'
     s.runBulkJobs(jt, 1, last_i, 1)
