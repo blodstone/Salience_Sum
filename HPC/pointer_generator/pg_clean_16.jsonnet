@@ -14,8 +14,8 @@ local CUDA=0;
     "source_max_tokens": 400,
     "target_max_tokens": 100,
   },
-  "train_data_path": "/data/acp16hh/data/bbc/ready/clean/train.tsv",
-  "validation_data_path": "/data/acp16hh/data/bbc/ready/clean/validation.tsv",
+  "train_data_path": std.extVar("train_path"),
+  "validation_data_path": std.extVar("validation_path"),
   "model": {
     "type": "encoder_decoder_salience",
     "encoder": {

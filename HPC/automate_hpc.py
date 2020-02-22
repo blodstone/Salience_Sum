@@ -10,7 +10,13 @@ import argparse
 
 
 def create_sh(mode):
+    """
+    Creates all the scripts that would be run by the job script.
+    :param mode: sharc or dgx
+    :return: dictionary containing scripts with mode as keys
+    """
     spec_file = Path(args.spec_file)
+    data_path = Path(args.data_path)
     output_path = spec_file.absolute().parents[0]
     script_name = spec_file.absolute().parents[0].stem
     output_path.mkdir(parents=True, exist_ok=True)
@@ -22,27 +28,33 @@ def create_sh(mode):
         'sharc': [],
         'dgx': [],
     }
-    # Eg:pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,dgx,bbc
+    # Eg:pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,dgx,bbc,seed
     for i, line in enumerate(spec_file.open().readlines()):
         if line.strip() == '':
             continue
         package, jsonnet, model, server, dataset, seed = line.split(',')
         if package == 'pg_salience_feature':
-            test = 'test.salience.tsv'
+            train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
+            test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
+            validation_path = data_path / dataset / 'ready' / 'validation.salience.tsv'
         else:
-            test = 'test.tsv'
+            train_path = data_path / dataset / 'ready' / 'train.tsv'
+            test_path = data_path / dataset / 'ready' / 'test.tsv'
+            validation_path = data_path / dataset / 'ready' / 'validation.tsv'
         output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
-        output_str += f'DATA=/data/acp16hh/data/{dataset}\n'
+        output_str += f'DATA={str(data_path)}/{dataset}\n'
         output_str += 'module load apps/python/conda\n'
         output_str += 'module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176\n'
         output_str += 'source activate gwen\n'
+        output_str += f'export train_path={str(train_path)}\n'
+        output_str += f'export validation_path={str(validation_path)}\n'
         output_str += f'allennlp train -s $MODEL -f ' \
                       f'--file-friendly-logging ' \
                       f'--include-package {package} ' \
                       f'/home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet}\n'
         output_str += f'python /home/acp16hh/Salience_Sum/postprocess/retrieve_last_model.py $MODEL\n'
         output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
-                      f'-input $DATA/ready/{test} -vocab_path $MODEL/vocabulary ' \
+                      f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
                       f'-model $MODEL/pick.th ' \
                       f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
                       f'-output_path ' \
@@ -118,6 +130,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sharc', help='Run script for sharc only.', action='store_true')
     parser.add_argument('--dgx', help='Run script for dgx only.', action='store_true')
+    parser.add_argument('-data_path', help='Data path.')
     parser.add_argument('-spec_file', help='Path to spec file.')
     args = parser.parse_args()
     main()
