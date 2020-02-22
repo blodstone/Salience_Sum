@@ -1,10 +1,8 @@
 #!/bin/bash
 export RANDOM_SEED=100
-
 export NUMPY_SEED=100
-
 export PYTORCH_SEED=100
-
+export CUDA_VISIBLE_DEVICES=0
 HOME=/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceSum
 MODEL=$HOME/data/output/pg_salience_feature/bbc/dgx/salience_emb_attn_16/100
 DATA=$HOME/data/bbc
