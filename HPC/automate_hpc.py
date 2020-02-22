@@ -87,7 +87,7 @@ def main():
 def build_run_job(s, mode, last_i):
     output_path = Path(args.spec_file).parents[0]
     jt = s.createJobTemplate()
-    jt.args = [(output_path / mode)]
+    jt.args = [str(output_path / mode)]
     jt.blockEmail = False
     jt.workingDirectory = '/home/acp16hh/Salience_Sum'
     jt.email = ['hhardy2@sheffield.ac.uk']
