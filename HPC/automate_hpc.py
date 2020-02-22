@@ -25,12 +25,12 @@ def create_sh(mode):
     for i, line in enumerate(spec_file.open().readlines()):
         if line.strip() == '':
             continue
-        package, jsonnet, model, server, dataset, random_seed, numpy_seed, pytorch_seed = line.split(',')
+        package, jsonnet, model, server, dataset, seed = line.split(',')
         if package == 'pg_salience_feature':
             test = 'test.salience.tsv'
         else:
             test = 'test.tsv'
-        output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}\n'
+        output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
         output_str += f'DATA=/data/acp16hh/data/{dataset}\n'
         output_str += 'module load apps/python/conda\n'
         output_str += 'module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176\n'
@@ -46,9 +46,9 @@ def create_sh(mode):
                       f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
                       f'-output_path ' \
                       f'$DATA/result/test_{package}_{dataset}_{server}_{model}.out -batch_size 24'
-        seed_str = f'export RANDOM_SEED={random_seed}\n' \
-                   f'export NUMPY_SEED={numpy_seed}\n' \
-                   f'export PYTORCH_SEED={pytorch_seed}'
+        seed_str = f'export RANDOM_SEED={seed}\n' \
+                   f'export NUMPY_SEED={seed}\n' \
+                   f'export PYTORCH_SEED={seed}'
         if server == 'sharc':
             server_output['sharc'].append(output_str)
             seeds['sharc'].append(seed_str)
