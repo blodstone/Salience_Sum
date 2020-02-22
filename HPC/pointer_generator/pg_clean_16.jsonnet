@@ -2,6 +2,9 @@ local HIDDEN=512;
 local EMBEDDING=128;
 local CUDA=0;
 {
+  "random_seed": std.parseInt(std.extVar("RANDOM_SEED")),
+  "numpy_seed": std.parseInt(std.extVar("NUMPY_SEED")),
+  "pytorch_seed": std.parseInt(std.extVar("PYTORCH_SEED")),
   "dataset_reader": {
     "type": "summdatareader_salience",
     "lazy": false,
