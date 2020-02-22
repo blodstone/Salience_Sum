@@ -52,7 +52,7 @@ def create_sh(mode):
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
         job_file = (output_path / 'jobs_sharc.sh')
-        job_file.write_text('#!/bin/bash\n". $1/script_$SGE_TASK_ID.sh"')
+        job_file.write_text('#!/bin/bash\n. $1/script_$SGE_TASK_ID.sh')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
     if mode == 'dgx' or mode == 'all':
@@ -63,7 +63,7 @@ def create_sh(mode):
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
         job_file = (output_path / 'jobs_dgx.sh')
-        job_file.write_text('#!/bin/bash\n". $1/script_$SGE_TASK_ID.sh"')
+        job_file.write_text('#!/bin/bash\n. $1/script_$SGE_TASK_ID.sh')
         st = os.stat(str(job_file))
         os.chmod(str(job_file), st.st_mode | stat.S_IEXEC)
     return server_output
