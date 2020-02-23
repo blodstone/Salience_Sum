@@ -12,9 +12,13 @@ class Decoder(Module, Registrable):
     def __init__(self,
                  input_size: int,
                  hidden_size: int,
+                 is_emb_attention: bool = False,
+                 emb_attention_mode: str = 'mlp',
                  attention: Attention = None,
                  training: bool = True) -> None:
         super().__init__()
+        self.emb_attention_mode = emb_attention_mode
+        self.is_emb_attention = is_emb_attention
         self.vocab = None
         self.training = training
         self.hidden_size = hidden_size
@@ -55,8 +59,6 @@ class Decoder(Module, Registrable):
                 is_coverage: bool,
                 is_training: bool = True,
                 is_first_step: bool = False,
-                is_emb_attention: bool = False,
-                emb_attention_mode: str = 'mlp',
                 ):
         input_feed = state['input_feed']
         source_ids = state['source_ids']
@@ -82,7 +84,8 @@ class Decoder(Module, Registrable):
                 self.attention(
                     rnn_output, states, states_features,
                     source_mask, coverage, is_coverage,
-                    emb_salience_feature, is_emb_attention, emb_attention_mode
+                    emb_salience_feature, self.is_emb_attention,
+                    self.emb_attention_mode
                 )
             input_feed = decoder_output
         else:
