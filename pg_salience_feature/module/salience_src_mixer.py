@@ -19,7 +19,7 @@ class SalienceSourceMixer(Module, Registrable):
         self.embedding_size = embedding_size
         self.salience_embedder = salience_embedder
         self.linear_salience = Linear(self.embedding_size,
-                                      self.hidden_size * 2,
+                                      self.hidden_size,
                                       bias=False)
 
 
