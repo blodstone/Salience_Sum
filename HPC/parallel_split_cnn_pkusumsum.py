@@ -27,7 +27,7 @@ def build_tmp_folders(input_path, tmp_path):
     for j, files in split_files.items():
         for file in files:
             (tmp_path / str(j)).mkdir(parents=True, exist_ok=True)
-            shutil.copy(str(file), str(tmp_path / str(j) / 'restbody' / file.stem))
+            shutil.copy(str(file), str(tmp_path / str(j) / 'docs' / file.stem))
         tmp_folders.append(tmp_path / str(j))
     return tmp_folders, len(tmp_folders)
 
@@ -81,7 +81,7 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-input_path', help='Input path to restbody.')
+    parser.add_argument('-input_path', help='Input path to docs.')
     parser.add_argument('-tmp_path', help='Temporary path for intermediary files.')
     parser.add_argument('-pkusumsum_path', help='PKUSUMSUM path.')
     parser.add_argument('-n', help='Number of parallel process.', type=int)
