@@ -23,6 +23,6 @@ def main():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-model_folder', help='The model folder.')
+    parser.add_argument('model_folder', help='The model folder.')
     args = parser.parse_args()
     main()
