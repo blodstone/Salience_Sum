@@ -44,7 +44,7 @@ def create_sh(mode):
         output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
         output_str += f'DATA={str(data_path)}/{dataset}\n'
         output_str += 'module load apps/python/conda\n'
-        output_str += 'module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176\n'
+        output_str += 'module libs/cudnn/7.6.5.32/binary-cuda-10.0.130\n'
         output_str += 'source activate gwen\n'
         output_str += f'export train_path={str(train_path)}\n'
         output_str += f'export validation_path={str(validation_path)}\n'
@@ -112,12 +112,13 @@ def main():
 
 def build_run_job(s, mode, last_i):
     output_path = Path(args.spec_file).absolute().parents[0]
+    script_name = spec_file.absolute().parents[0].stem
     jt = s.createJobTemplate()
     jt.blockEmail = False
     jt.joinFiles = True
     jt.workingDirectory = '/home/acp16hh/Salience_Sum'
     jt.email = ['hhardy2@sheffield.ac.uk']
-    jt.remoteCommand = str(output_path / f'jobs_{mode}.sh')
+    jt.remoteCommand = str(output_path / f'jobs_{script_name}_{mode}.sh')
     if mode == 'sharc':
         jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=40G -l h_rt=96:00:00'
     elif mode == 'dgx':

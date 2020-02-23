@@ -12,7 +12,7 @@
 git checkout dev
 MODEL=/data/acp16hh/Exp_Gwen_Saliency/pg_salience_feature/bilinear_16
 module load apps/python/conda
-module load libs/cudnn/7.3.1.20/binary-cuda-9.0.176
+module load libs/cudnn/7.6.5.32/binary-cuda-10.0.130
 source activate gwen
 
 allennlp train -s $MODEL -f --file-friendly-logging --include-package pg_salience_feature HPC/dgx/pg_salience_feature/pg_salience_bilinear_16.jsonnet

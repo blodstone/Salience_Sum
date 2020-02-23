@@ -1,0 +1,15 @@
+pg_salience_feature,pg_salience_emb_mlp_attn_16.jsonnet,salience_emb_attn_16,sharc,bbc,100
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,100
+pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,sharc,bbc,100
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,bbc,100
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,cnn,100
+pg_salience_feature,pg_salience_emb_mlp_attn_16.jsonnet,salience_emb_attn_16,sharc,bbc,200
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,200
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,bbc,200
+pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,sharc,bbc,200
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,cnn,200
+pg_salience_feature,pg_salience_emb_mlp_attn_16.jsonnet,salience_emb_attn_16,sharc,bbc,300
+pg_salience_feature,pg_salience_attn_16.jsonnet,salience_attn_16,sharc,bbc,300
+pg_salience_feature,pg_salience_emb_mlp_16.jsonnet,emb_mlp_16,sharc,bbc,300
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,bbc,300
+pointer_generator,pg_clean_16.jsonnet,pg_clean_16,sharc,cnn,300
