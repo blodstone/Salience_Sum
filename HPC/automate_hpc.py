@@ -112,7 +112,7 @@ def main():
 
 def build_run_job(s, mode, last_i):
     output_path = Path(args.spec_file).absolute().parents[0]
-    script_name = spec_file.absolute().parents[0].stem
+    script_name = Path(args.spec_file).absolute().parents[0].stem
     jt = s.createJobTemplate()
     jt.blockEmail = False
     jt.joinFiles = True
