@@ -119,8 +119,6 @@ def main():
                     salience = NER.process(salience_instance, nlp)
                 if salience:
                     salience_instance.salience_set[summ_group] = salience
-            if salience is None:
-                continue
             print(f'Processed ({len(dataset)}): {doc_id}')
             dataset[doc_id] = salience_instance
         if args.tfidf:

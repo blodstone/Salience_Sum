@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #$ -l gpu=1
 #$ -l rmem=24G
-#$ -l h_rt=48:00:00
+#$ -l h_rt=96:00:00
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb
 #$ -j y

@@ -20,6 +20,6 @@ def process(salience_instance: Instance, summ_path: Path = None) -> Salience:
                     line_idx, word_idx = salience_instance.index_map[abs_idx]
                     word = salience_instance.doc[line_idx][word_idx]
                     assert word == document[abs_idx]
-                    salience[line_idx][word_idx] += 1.0
+                    salience[line_idx][word_idx] = 1.0
                     abs_idx += 1
     return salience

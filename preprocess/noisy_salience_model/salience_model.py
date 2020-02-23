@@ -83,10 +83,10 @@ class Dataset(MutableMapping[str, Instance]):
         return iter(self.dataset)
 
     def write_to_file(self, output_path: Path, extra_name: str):
-        (output_path / extra_name).mkdir(parents=True, exist_ok=True)
-        tsv_file = output_path / extra_name / f'{self.dataset_name}.raw.tsv'
-        src_file = output_path / extra_name / f'{self.dataset_name}.raw.src.txt'
-        tgt_file = output_path / extra_name / f'{self.dataset_name}.raw.tgt.txt'
+        output_path.mkdir(parents=True, exist_ok=True)
+        tsv_file = output_path / f'{self.dataset_name}.{extra_name}.tsv'
+        src_file = output_path / f'{self.dataset_name}.{extra_name}.src.txt'
+        tgt_file = output_path / f'{self.dataset_name}.{extra_name}.tgt.txt'
         if tsv_file.exists():
             print(f'{str(tsv_file)} exists. Deleting file.')
             os.remove(str(tsv_file))

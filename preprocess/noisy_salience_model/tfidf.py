@@ -18,7 +18,9 @@ def process(dataset: Dataset, doc_word_count: Counter) -> Dataset:
     for doc_id, instance in dataset.dataset.items():
         print(f'Processed tfidf ({i}): {doc_id}')
         i += 1
-        salience = SalienceSet.init_salience_set(instance.doc_size)
+        salience_tfidf = SalienceSet.init_salience_set(instance.doc_size)
+        salience_tf = SalienceSet.init_salience_set(instance.doc_size)
+        salience_idf = SalienceSet.init_salience_set(instance.doc_size)
         for i, line in enumerate(instance.doc):
             for j, word in enumerate(line):
                 doc_size = len(doc_word_count.keys())
@@ -26,7 +28,11 @@ def process(dataset: Dataset, doc_word_count: Counter) -> Dataset:
                     word, sum([1 for _, counter in doc_word_count.items() if counter[word] > 0]))
                 save_word_doc_number[word] = word_doc_number
                 idf = math.log(doc_size / (1 + word_doc_number)) + 1
-                salience[i][j] = idf * math.log(doc_word_count[doc_id][word] + 1)
-                assert salience[i][j] != 0.0
-        dataset[doc_id].salience_set['tfidf'] = salience
+                salience_tfidf[i][j] = idf * math.log(doc_word_count[doc_id][word] + 1)
+                salience_tf[i][j] = doc_word_count[doc_id][word]
+                salience_idf[i][j] = idf
+                assert salience_tfidf[i][j] != 0.0
+        dataset[doc_id].salience_set['tfidf'] = salience_tfidf
+        dataset[doc_id].salience_set['tf'] = salience_tf
+        dataset[doc_id].salience_set['idf'] = salience_idf
     return dataset
