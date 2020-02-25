@@ -6,6 +6,7 @@ import drmaa
 import os
 import stat
 
+
 def split_folders(files, n):
     i = 0
     j = 1
@@ -87,3 +88,17 @@ if __name__ == '__main__':
     parser.add_argument('-n', help='Number of parallel process.', type=int)
     args = parser.parse_args()
     main()
+
+# Note
+# summarize_centroid.sh
+#   - script_centroid_1.sh
+#   - script_centroid_2.sh
+# summarize_lexpagerank.sh
+#
+# - input_path => data/bbc/raw/restbody
+# - tmp_path => data/bbc/intermediary
+#   - tmp_path / 1 / restbody
+#   - tmp_path / 1 / centroid
+#   - tmp_path / 1 / scripts_centroid.sh
+#   - tmp_path / 2 / restbody
+#   - tmp_path / module
