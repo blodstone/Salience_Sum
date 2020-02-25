@@ -11,4 +11,4 @@ export train_path=$DATA/ready/train.salience.tsv
 export validation_path=$DATA/ready/validation.salience.tsv
 #allennlp train -s $MODEL -f --file-friendly-logging --include-package pg_salience_feature $HOME/HPC/pg_salience_feature/pg_salience_emb_mlp_attn_16.jsonnet
 #python $HOME/postprocess/retrieve_last_model.py $MODEL
-python $HOME/summarize.py -module pg_salience_feature -input $DATA/ready/test.salience.tsv -vocab_path $MODEL/vocabulary -model $MODEL/best.th -model_config $HOME/HPC/pg_salience_feature/pg_salience_emb_mlp_attn_16.jsonnet -output_path $DATA/result/test_pg_salience_feature_bbc_dgx_salience_emb_attn_16.out -batch_size 24 --cuda
+python $HOME/summarize.py -module pg_salience_feature -input $DATA/ready/test.salience.tsv -vocab_path $MODEL/vocabulary -model $MODEL/best.th -model_config $HOME/HPC/pg_salience_feature/pg_salience_emb_mlp_attn_16.jsonnet -output_path $DATA/result_2/test_pg_salience_feature_bbc_dgx_salience_emb_attn_16_100.out -batch_size 24 --cuda
