@@ -80,9 +80,8 @@ class EncoderDecoder(Model):
         batch_size = states.size(0)
         length = states.size(1)
         state['input_feed'] = states.new_zeros((batch_size, 1, states.size(2)))
-        state['dec_state'] = torch.cat((state['hidden'], state['context']), dim=2)
         state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
-        state['hidden_context'] = state['dec_state'].new_zeros(state['dec_state'].size())
+        state['hidden_context'] = state['input_feed'].new_zeros(state['input_feed'].size())
         return state
 
     def _forward_beam_search(self,
@@ -204,7 +203,8 @@ class EncoderDecoder(Model):
         :return: All the states and the last state
         """
         state = self.init_enc_state(source_tokens)
-        embedded_src, emb_salience_feature = self.salience_source_mixer(salience_values, self.source_embedder(source_tokens))
+        embedded_src, emb_salience_feature = self.salience_source_mixer(
+            salience_values, self.source_embedder(source_tokens))
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \
             self.encoder(embedded_src, state['source_lengths'])
@@ -214,7 +214,10 @@ class EncoderDecoder(Model):
             batch_size,
             final_state.size(0),
             final_state.size(2))  # (B, L, Num Direction * D_h)
-        state['context'] = final_context_state.view(batch_size, final_context_state.size(0), final_context_state.size(2))  # (B, L, Num Direction * D_h)
+        state['context'] = final_context_state.view(
+            batch_size,
+            final_context_state.size(0),
+            final_context_state.size(2))  # (B, L, Num Direction * D_h)
         state['states_features'] = states_features  # (B, L, Num Direction * D_h)
         state['emb_salience_feature'] = emb_salience_feature  # (B, L, EmbDim)
         assert state['encoder_states'].size(2) == self.hidden_size

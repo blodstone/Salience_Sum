@@ -14,12 +14,10 @@ class Attention(Module, Registrable):
             self.num_directions = 1
         self.hidden = hidden_size
         # The query is cat[emb, attn_hidden]
-        self._linear_query = Linear(hidden_size,
-                                    hidden_size, bias=True)
-        self._linear_coverage = Linear(1, hidden_size, bias=False)
-        self._v = Linear(hidden_size, 1, bias=False)
+        self._linear_query = Linear(2 * hidden_size, 2 * hidden_size)
+        self._linear_coverage = Linear(1, 2 * hidden_size, bias=False)
+        self._v = Linear(2 * hidden_size, 1, bias=False)
         self._softmax = Softmax(dim=1)
-        self.linear_out = Linear(hidden_size * 2, hidden_size, bias=True)
 
     def score(self, query: torch.Tensor,
               states: torch.Tensor,
@@ -54,8 +52,7 @@ class Attention(Module, Registrable):
             total_features = query_features + states_features + coverages_features
         else:
             if is_emb_attention:
-                total_features = query_features + states_features \
-                                 + emb_salience_feature
+                total_features = query_features + states_features + emb_salience_feature
             else:
                 total_features = query_features + states_features
         # (B x L_src x 2H)
@@ -98,9 +95,8 @@ class Attention(Module, Registrable):
         alignments = alignments.masked_fill(~source_mask.bool().unsqueeze(2), float('-inf'))
         align_vectors = self._softmax(alignments)
         # (B, L_tgt, L_src) X (B, L_src, 2*H) = (B, L_tgt, 2*H)
-        c = torch.bmm(align_vectors.transpose(1, 2), states)
-        concat_c = torch.cat([c, query], 2)
-        attn_h = self.linear_out(concat_c)
+        attn_h = torch.bmm(align_vectors.transpose(1, 2), states)
+        attn_h = self.linear_out(c)
         # (B, L_src, 1)
         # attentions = attentions.transpose(1, 2).contiguous()
         new_coverage = coverage + align_vectors

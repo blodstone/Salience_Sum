@@ -28,14 +28,14 @@ class Decoder(Module, Registrable):
                         num_layers=1,
                         batch_first=True)
         self.input_context = Linear(
-            hidden_size + input_size, input_size)
+            2 * hidden_size + input_size, input_size)
         if attention is None:
             self.is_attention = False
         else:
             self.is_attention = True
             self.attention = attention
             self._p_gen = Sequential(
-                Linear(self.hidden_size + input_size, 1, bias=True),
+                Linear(self.hidden_size * 4 + input_size, 1, bias=True),
                 Sigmoid()
             )
         self.gen_vocab_dist = None
@@ -43,6 +43,7 @@ class Decoder(Module, Registrable):
     def add_vocab(self, vocab: Vocabulary):
         self.vocab = vocab
         self.gen_vocab_dist = Sequential(
+            Linear(self.hidden_size * 3, self.hidden_size),
             Linear(self.hidden_size, self.vocab.get_vocab_size()),
             Softmax(dim=-1)
         )
@@ -78,11 +79,15 @@ class Decoder(Module, Registrable):
         rnn_output, final = self.rnn(x,
                                      (hidden.view(1, batch_size, hidden.size(2)),
                                       context.view(1, batch_size, hidden.size(2))))
+        final_hidden, final_context = final
+        final_hat = torch.cat((
+            final_hidden.view(batch_size, 1, hidden.size(2)),
+            final_context.view(batch_size, 1, hidden.size(2))), dim=2)
         if self.is_attention:
             # Attention step 0 to calculate coverage step 1
             decoder_output, coverage, attention = \
                 self.attention(
-                    rnn_output, states, states_features,
+                    final_hat, states, states_features,
                     source_mask, coverage, is_coverage,
                     emb_salience_feature, self.is_emb_attention,
                     self.emb_attention_mode
@@ -93,7 +98,7 @@ class Decoder(Module, Registrable):
 
         if self.is_attention:
             state['class_probs'], state['p_gen'] = self._build_class_logits(
-                attention, decoder_output, rnn_output, x, source_ids, max_oov)
+                attention, decoder_output, final_hat, rnn_output, x, source_ids, max_oov)
         else:
             state['class_probs'], state['p_gen'] = self._build_class_logits_no_attn(decoder_output)
         state['coverage'] = coverage
@@ -106,13 +111,15 @@ class Decoder(Module, Registrable):
     def _build_class_logits(self,
                             attention: torch.Tensor,
                             decoder_output: torch.Tensor,
+                            final_hat: torch.Tensor,
                             rnn_output: torch.Tensor,
                             x: torch.Tensor,
                             source_ids: torch.Tensor,
                             max_oov: torch.Tensor
                             ) -> Tuple[torch.Tensor, torch.Tensor]:
-        p_gen = self._p_gen(torch.cat((decoder_output, x), dim=2))
-        vocab_dist = (p_gen * self.gen_vocab_dist(decoder_output)).squeeze(1)
+        p_gen = self._p_gen(torch.cat((decoder_output, final_hat, x), dim=2))
+        out = torch.cat((decoder_output, rnn_output), dim=2)
+        vocab_dist = (p_gen * self.gen_vocab_dist(out)).squeeze(1)
         if (max_oov.max() + 1).item() > self.vocab.get_vocab_size():
             extended_vocab = vocab_dist.new_zeros([vocab_dist.size(0), max_oov.max() + 1])
             extended_vocab[:, :vocab_dist.size(1)] = vocab_dist

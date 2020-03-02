@@ -18,12 +18,12 @@ def process_set(split, folder_path):
         open(os.path.join(folder_path, split + '.sal.txt'), 'w').write('\n'.join(saliences))
 
 
-
 def main():
     folder_path = '../data/bbc_highres'
     splits = ['test']
     for split in splits:
         process_set(split, folder_path)
+
 
 if __name__ == '__main__':
     main()

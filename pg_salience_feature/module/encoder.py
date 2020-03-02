@@ -21,7 +21,7 @@ class Encoder(Seq2SeqEncoder):
                  bidirectional,
                  stateful: bool = False) -> None:
         super().__init__(stateful)
-        self.hidden_size = hidden_size // 2
+        self.hidden_size = hidden_size
         if bidirectional:
             self.num_directions = 2
         else:
@@ -33,13 +33,14 @@ class Encoder(Seq2SeqEncoder):
                         num_layers=self.num_layers,
                         bidirectional=bidirectional,
                         batch_first=True)
-        self._linear_source = Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=False)
+        self._linear_source = Linear(self.hidden_size * self.num_directions,
+                                     self.hidden_size * self.num_directions, bias=False)
         self._reduce_h = Sequential(
-            Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=True),
+            Linear(self.hidden_size * self.num_directions, self.hidden_size, bias=True),
             ReLU()
         )
         self._reduce_c = Sequential(
-            Linear(self.hidden_size * self.num_directions, self.hidden_size * self.num_directions, bias=True),
+            Linear(self.hidden_size * self.num_directions, self.hidden_size, bias=True),
             ReLU()
         )
 
