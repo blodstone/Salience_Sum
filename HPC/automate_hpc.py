@@ -33,14 +33,9 @@ def create_sh(mode):
         if line.strip() == '':
             continue
         package, jsonnet, model, server, dataset, seed = line.split(',')
-        if package == 'pg_salience_feature':
-            train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
-            test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
-            validation_path = data_path / dataset / 'ready' / 'validation.salience.tsv'
-        else:
-            train_path = data_path / dataset / 'ready' / 'train.tsv'
-            test_path = data_path / dataset / 'ready' / 'test.tsv'
-            validation_path = data_path / dataset / 'ready' / 'validation.tsv'
+        train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
+        test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
+        validation_path = data_path / dataset / 'ready' / 'validation.salience.tsv'
         output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
         output_str += f'DATA={str(data_path)}/{dataset}\n'
         output_str += 'module load apps/python/conda\n'
@@ -120,9 +115,9 @@ def build_run_job(s, mode, last_i):
     jt.email = ['hhardy2@sheffield.ac.uk']
     jt.remoteCommand = str(output_path / f'jobs_{script_name}_{mode}.sh')
     if mode == 'sharc':
-        jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=40G -l h_rt=96:00:00'
+        jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=32G -l h_rt=96:00:00'
     elif mode == 'dgx':
-        jt.nativeSpecification = '-P rse -q rse.q -tc 5 -l gpu=1 -l rmem=40G -l h_rt=96:00:00'
+        jt.nativeSpecification = '-P rse -q rse.q -tc 5 -l gpu=1 -l rmem=32G -l h_rt=96:00:00'
     s.runBulkJobs(jt, 1, last_i, 1)
     s.deleteJobTemplate(jt)
 
