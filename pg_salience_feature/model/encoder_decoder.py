@@ -24,46 +24,6 @@ from pg_salience_feature.module.salience_src_mixer import SalienceSourceMixer
 @Model.register("enc_dec_salience_feature")
 class EncoderDecoder(Model):
 
-    def __init__(self,
-                 source_embedder: TextFieldEmbedder,
-                 target_embedder: TextFieldEmbedder,
-                 coverage_lambda: float,
-                 max_steps: int,
-                 salience_source_mixer: SalienceSourceMixer,
-                 encoder: Encoder,
-                 decoder: Decoder,
-                 vocab: Vocabulary,
-                 teacher_force_ratio: float,
-                 regularizer: RegularizerApplicator = None) -> None:
-        super().__init__(vocab, regularizer)
-        # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
-        self.salience_source_mixer = salience_source_mixer
-        self.coverage_lambda = coverage_lambda
-        if coverage_lambda == 0.0:
-            self.is_coverage = False
-        else:
-            self.is_coverage = True
-        # For end and start tokens
-        self.max_steps = max_steps + 2
-        self.source_embedder = source_embedder
-        self.target_embedder = target_embedder
-        self.target_embedder._modules['token_embedder_tokens'].weight = \
-            self.source_embedder._modules['token_embedder_tokens'].weight
-        self.encoder = encoder
-        self.hidden_size = self.encoder.get_output_dim()
-        self.decoder = decoder
-        self.teacher_force_ratio = teacher_force_ratio
-        self.decoder.add_vocab(self.vocab)
-        self.padding_idx = self.vocab.get_token_index(DEFAULT_PADDING_TOKEN)
-        self.start_idx = self.vocab.get_token_index(START_SYMBOL)
-        self.end_idx = self.vocab.get_token_index(END_SYMBOL)
-        self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
-        self.criterion = NLLLoss(ignore_index=self.padding_idx)
-        self.coverage_loss = 0.0
-        self.p_gen = 0.0
-
-    # noinspection PyMethodMayBeStatic
     def init_enc_state(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         source_mask = util.get_text_field_mask(source_tokens)
         source_lengths = get_lengths_from_binary_sequence_mask(source_mask)
@@ -74,6 +34,7 @@ class EncoderDecoder(Model):
         }
         return state
 
+    # noinspection PyMethodMayBeStatic
     @staticmethod
     def init_dec_state(state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         states = state['encoder_states']
@@ -116,6 +77,45 @@ class EncoderDecoder(Model):
             "predictions": list(zip(*system_summaries))
         }
         return output_dict
+
+    def __init__(self,
+                 source_embedder: TextFieldEmbedder,
+                 target_embedder: TextFieldEmbedder,
+                 coverage_lambda: float,
+                 max_steps: int,
+                 encoder: Encoder,
+                 decoder: Decoder,
+                 vocab: Vocabulary,
+                 teacher_force_ratio: float,
+                 salience_source_mixer: SalienceSourceMixer = None,
+                 regularizer: RegularizerApplicator = None) -> None:
+        super().__init__(vocab, regularizer)
+        # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
+        self.salience_source_mixer = salience_source_mixer
+        self.coverage_lambda = coverage_lambda
+        if coverage_lambda == 0.0:
+            self.is_coverage = False
+        else:
+            self.is_coverage = True
+        # For end and start tokens
+        self.max_steps = max_steps + 2
+        self.source_embedder = source_embedder
+        self.target_embedder = target_embedder
+        self.target_embedder._modules['token_embedder_tokens'].weight = \
+            self.source_embedder._modules['token_embedder_tokens'].weight
+        self.encoder = encoder
+        self.hidden_size = self.encoder.get_output_dim()
+        self.decoder = decoder
+        self.teacher_force_ratio = teacher_force_ratio
+        self.decoder.add_vocab(self.vocab)
+        self.padding_idx = self.vocab.get_token_index(DEFAULT_PADDING_TOKEN)
+        self.start_idx = self.vocab.get_token_index(START_SYMBOL)
+        self.end_idx = self.vocab.get_token_index(END_SYMBOL)
+        self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
+        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
+        self.criterion = NLLLoss(ignore_index=self.padding_idx)
+        self.coverage_loss = 0.0
+        self.p_gen = 0.0
 
     def take_step(self,
                   last_predictions: torch.Tensor,
@@ -203,8 +203,11 @@ class EncoderDecoder(Model):
         :return: All the states and the last state
         """
         state = self.init_enc_state(source_tokens)
-        embedded_src, emb_salience_feature = self.salience_source_mixer(
-            salience_values, self.source_embedder(source_tokens))
+        embedded_src = self.source_embedder(source_tokens)
+        emb_salience_feature = None
+        if salience_values is not None:
+            embedded_src, emb_salience_feature = self.salience_source_mixer(
+                salience_values, embedded_src)
         # final_state = (last state, last context)
         states_features, states, final_state, final_context_state = \
             self.encoder(embedded_src, state['source_lengths'])

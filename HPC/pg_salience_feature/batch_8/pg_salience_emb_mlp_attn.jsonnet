@@ -57,7 +57,7 @@ local CUDA=0;
               "trainable": true
           }
       }
-    },
+    },16
     "target_embedder": {
       "token_embedders": {
           "tokens": {
@@ -71,16 +71,16 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 16,
+    "batch_size" : 8,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
     "summary_interval": 1000,
     "histogram_interval": 1000,
     "num_epochs": 30,
-    "patience": 8,
+    "patience": 5,
     "cuda_device": CUDA,
-    "num_serialized_models_to_keep": 1,
+    "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
     "optimizer": {
       "type": "adagrad",

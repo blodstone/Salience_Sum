@@ -30,6 +30,9 @@ class Attention(Module, Registrable):
               ) -> torch.Tensor:
         """
         Bahdanau attention
+        :param emb_attention_mode:
+        :param emb_salience_feature:
+        :param is_emb_attention:
         :param is_coverage:
         :param states_features:
         :param coverage: The coverage of all the previous steps (dim: H)
@@ -96,7 +99,6 @@ class Attention(Module, Registrable):
         align_vectors = self._softmax(alignments)
         # (B, L_tgt, L_src) X (B, L_src, 2*H) = (B, L_tgt, 2*H)
         attn_h = torch.bmm(align_vectors.transpose(1, 2), states)
-        attn_h = self.linear_out(c)
         # (B, L_src, 1)
         # attentions = attentions.transpose(1, 2).contiguous()
         new_coverage = coverage + align_vectors

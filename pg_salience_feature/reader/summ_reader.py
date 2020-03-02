@@ -32,18 +32,18 @@ class SummDataReader(DatasetReader):
     def process_line(self, line):
         src_seq, tgt_seq = line.split('\t')
         return_res = []
+        collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
+        src_seq = collection_seq[0]
+        return_res.append([Token(token) for token in src_seq])
         if self._use_salience:
-            collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
-            src_seq = collection_seq[0]
             salience_seqs = [[float(value) if float(value) <= 1.0 else 1.0 for value in seq] for seq in collection_seq[1:]]
-            return_res.append([Token(token) for token in src_seq])
+
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
             else:
                 return_res.append(None)
             return_res.append(salience_seqs)
         else:
-            return_res.append([Token(token) for token in src_seq.split()])
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
         return return_res

@@ -1,12 +1,13 @@
 local HIDDEN=512;
 local EMBEDDING=128;
+local FEATURE=6;
 local CUDA=0;
 {
   "random_seed": std.parseInt(std.extVar("RANDOM_SEED")),
   "numpy_seed": std.parseInt(std.extVar("NUMPY_SEED")),
   "pytorch_seed": std.parseInt(std.extVar("PYTORCH_SEED")),
   "dataset_reader": {
-    "type": "summdatareader_salience",
+    "type": "summdatareader_salience_feature",
     "lazy": false,
     "interpolation": false,
     "predict": false,
@@ -17,7 +18,7 @@ local CUDA=0;
   "train_data_path": std.extVar("train_path"),
   "validation_data_path": std.extVar("validation_path"),
   "model": {
-    "type": "encoder_decoder_salience",
+    "type": "enc_dec_salience_feature",
     "encoder": {
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
@@ -25,8 +26,6 @@ local CUDA=0;
       "bidirectional": true
     },
     "teacher_force_ratio": 0.7,
-    "coverage_lambda": 0.0,
-    "salience_lambda": 0.0,
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
@@ -34,11 +33,9 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
+      "is_emb_attention": false
     },
-    "salience_predictor": {
-      "hidden_size": HIDDEN,
-      "bidirectional": true,
-    },
+    "coverage_lambda": 0.0,
     "max_steps": 100,
     "source_embedder": {
       "token_embedders": {
@@ -62,14 +59,14 @@ local CUDA=0;
   "iterator": {
     "type": "bucket",
     "padding_noise": 0.0,
-    "batch_size" : 16,
+    "batch_size" : 8,
     "sorting_keys": [["source_tokens", "num_tokens"]]
   },
   "trainer": {
-    "summary_interval": 500,
+    "summary_interval": 1000,
     "histogram_interval": 1000,
     "num_epochs": 30,
-    "patience": 8,
+    "patience": 5,
     "cuda_device": CUDA,
     "num_serialized_models_to_keep": 5,
     "grad_norm": 2,
