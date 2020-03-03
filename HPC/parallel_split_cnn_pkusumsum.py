@@ -78,7 +78,7 @@ def main():
             jt.errorPath = os.path.join(os.getcwd(), 'error.log')
             jt.workingDirectory = '/home/acp16hh/Salience_Sum'
             jt.email = ['hhardy2@sheffield.ac.uk']
-            jt.remoteCommand = file_path
+            jt.remoteCommand = str(file_path)
             s.runBulkJobs(jt, 1, num_of_folders, 1)
             s.deleteJobTemplate(jt)
 
