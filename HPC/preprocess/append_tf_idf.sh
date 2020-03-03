@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#$ -l rmem=120G
+#$ -l rmem=48G
 #$ -l h_rt=128:00:00
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb

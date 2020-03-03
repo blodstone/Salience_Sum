@@ -27,7 +27,7 @@ def build_tmp_folders(input_path, tmp_path):
     tmp_folders = []
     for j, files in split_files.items():
         for file in files:
-            (tmp_path / str(j)).mkdir(parents=True, exist_ok=True)
+            (tmp_path / str(j) / 'docs').mkdir(parents=True, exist_ok=True)
             shutil.copy(str(file), str(tmp_path / str(j) / 'docs' / file.stem))
         tmp_folders.append(tmp_path / str(j))
     return tmp_folders, len(tmp_folders)
@@ -75,7 +75,6 @@ def main():
             jt.workingDirectory = '/home/acp16hh/Salience_Sum'
             jt.email = ['hhardy2@sheffield.ac.uk']
             jt.remoteCommand = file_path
-            jt.nativeSpecification = '-l h_rt=48:00:00'
             s.runBulkJobs(jt, 1, num_of_folders, 1)
             s.deleteJobTemplate(jt)
 
