@@ -2,7 +2,7 @@
 #$ -M hhardy2@sheffield.ac.uk
 #$ -m easb
 #$ -j y
-#$ -o split_cnn_to_restbody.txt
+#$ -o run_cnn_pkusumsum.txt
 #$ -wd /home/acp16hh/Salience_Sum
 
 module load apps/python/conda
