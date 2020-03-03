@@ -27,8 +27,9 @@ def build_tmp_folders(input_path, tmp_path):
     tmp_folders = []
     for j, files in split_files.items():
         for file in files:
-            (tmp_path / str(j) / 'docs').mkdir(parents=True, exist_ok=True)
-            shutil.copy(str(file), str(tmp_path / str(j) / 'docs' / file.stem))
+            if 'sh' not in file.stem:
+                (tmp_path / str(j) / 'docs').mkdir(parents=True, exist_ok=True)
+                shutil.copy(str(file), str(tmp_path / str(j) / 'docs' / file.stem))
         tmp_folders.append(tmp_path / str(j))
     return tmp_folders, len(tmp_folders)
 
@@ -39,11 +40,11 @@ def build_sh_scripts(tmp_folders, pkusumsum_path, modules):
             i = folder.stem
             (folder / module).mkdir(exist_ok=True, parents=True)
             output_str = 'module load apps/java/jdk1.8.0_102/binary\n'
-            output_str += f'for filename in {str(folder)}/*; do\n'
-            output_str += f'\tjava -jar {str(pkusumsum_path)}/PKUSUMSUM.jar -T 1 -input $filename -L 2 -m {param} -n 100 -stop {pkusumsum_path}/lib/stopword_Eng -output {str(folder / module)}/$(basename -- $filename)\n'
+            output_str += f'for filename in {str(folder)}/docs/*; do\n'
+            output_str += f'\tjava -jar {str(pkusumsum_path)}/PKUSUMSUM.jar -T 1 -input $filename -L 2 -m {param} -n 100 -stop {pkusumsum_path}/lib/stopword_Eng -output {str(folder / module)}/$(basename -- $filename).summ\n'
             output_str += '\techo $filename\n'
             output_str += 'done'
-            file_path = (folder / f'script_{module}.{str(i)}.sh')
+            file_path = (folder.parent / f'script_{module}.{str(i)}.sh')
             file_path.open('w').write(output_str)
             st = os.stat(str(file_path))
             os.chmod(str(file_path), st.st_mode | stat.S_IEXEC)
@@ -65,7 +66,7 @@ def main():
     with drmaa.Session() as s:
         for module, _ in modules.items():
             output_str = '#!/usr/bin/env bash\n'
-            output_str += f'. {tmp_path}/$SGE_TASK_ID/script_{module}.$SGE_TASK_ID.sh'
+            output_str += f'. {tmp_path}/script_{module}.$SGE_TASK_ID.sh'
             file_path = (tmp_path / f'summarize_{module}.sh')
             file_path.open('w').write(output_str)
             st = os.stat(str(file_path))
