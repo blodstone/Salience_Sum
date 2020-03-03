@@ -57,7 +57,7 @@ local CUDA=0;
               "trainable": true
           }
       }
-    },16
+    },
     "target_embedder": {
       "token_embedders": {
           "tokens": {
