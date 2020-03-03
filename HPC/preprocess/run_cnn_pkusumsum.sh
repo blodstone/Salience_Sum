@@ -6,7 +6,6 @@
 #$ -wd /home/acp16hh/Salience_Sum
 
 module load apps/python/conda
-module load apps/java/jdk1.8.0_102/binary
 source activate gwen
 
 python HPC/parallel_split_cnn_pkusumsum.py -input_path /data/acp16hh/data/cnn/raw/docs -tmp_path /data/acp16hh/data/cnn/intermediary/raw -pkusumsum_path /home/acp16hh/PKUSUMSUM -n 75000

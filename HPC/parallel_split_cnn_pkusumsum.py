@@ -38,7 +38,8 @@ def build_sh_scripts(tmp_folders, pkusumsum_path, modules):
         for folder in tmp_folders:
             i = folder.stem
             (folder / module).mkdir(exist_ok=True, parents=True)
-            output_str = f'for filename in {str(folder)}/*; do\n'
+            output_str += f'module load apps/java/jdk1.8.0_102/binary\n'
+            output_str += f'for filename in {str(folder)}/*; do\n'
             output_str += f'\tjava -jar {str(pkusumsum_path)}/PKUSUMSUM.jar -T 1 -input $filename -L 2 -m {param} -n 100 -stop {pkusumsum_path}/lib/stopword_Eng -output {str(folder / module)}/$(basename -- $filename)\n'
             output_str += '\techo $filename\n'
             output_str += 'done'
