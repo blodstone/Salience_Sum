@@ -74,8 +74,8 @@ def main():
             jt = s.createJobTemplate()
             jt.blockEmail = False
             jt.joinFiles = True
-            jt.outputPath = os.path.join(os.getcwd(), 'output.log')
-            jt.errorPath = os.path.join(os.getcwd(), 'error.log')
+            jt.outputPath = 'run_cnn_pkusumsum_output.log'
+            jt.errorPath = 'run_cnn_pkusumsum_output.log'
             jt.workingDirectory = '/home/acp16hh/Salience_Sum'
             jt.email = ['hhardy2@sheffield.ac.uk']
             jt.remoteCommand = str(file_path)
