@@ -29,10 +29,10 @@ local CUDA=0;
       "type": "emb_mlp",
       "embedding_size": EMBEDDING,
       "feature_size": FEATURE,
+      "hidden_size": HIDDEN,
       "salience_embedder": {
         "embedding_size": EMBEDDING,
         "feature_size": FEATURE,
-        "hidden_size": HIDDEN,
         "type": "vector",
       },
     },

@@ -9,7 +9,7 @@ def main():
     p = re.compile(r'(?P<epoch>[0-9]+)\.th')
     epoch = -1
     for file in model_folder.iterdir():
-        m = p.search(file.stem)
+        m = p.search(file.name)
         if m is not None:
             if int(m.group('epoch')) > epoch:
                 epoch = int(m.group('epoch'))
