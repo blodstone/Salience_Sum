@@ -9,7 +9,7 @@ import drmaa
 import argparse
 
 
-def create_sh(mode):
+def create_sh(mode, param):
     """
     Creates all the scripts that would be run by the job script.
     :param mode: sharc or dgx
@@ -43,7 +43,7 @@ def create_sh(mode):
         output_str += 'source activate gwen\n'
         output_str += f'export train_path={str(train_path)}\n'
         output_str += f'export validation_path={str(validation_path)}\n'
-        output_str += f'allennlp train -s $MODEL -f ' \
+        output_str += f'allennlp train -s $MODEL {param} ' \
                       f'--file-friendly-logging ' \
                       f'--include-package {package} ' \
                       f'/home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet}\n'
@@ -91,13 +91,17 @@ def create_sh(mode):
 
 
 def main():
+    if args.force:
+        param = '-f'
+    else:
+        param = '-r'
     if args.sharc:
         mode = 'sharc'
     elif args.dgx:
         mode = 'dgx'
     else:
         mode = 'all'
-    server_output = create_sh(mode)
+    server_output = create_sh(mode, param)
     with drmaa.Session() as s:
         if mode == 'sharc' or mode == 'all':
             build_run_job(s, 'sharc', len(server_output['sharc']))
@@ -126,6 +130,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sharc', help='Run script for sharc only.', action='store_true')
     parser.add_argument('--dgx', help='Run script for dgx only.', action='store_true')
+    parser.add_argument('--force', help='Apply -f to allennlp training. Will delete the data.', action='store_true')
     parser.add_argument('-data_path', help='Data path.')
     parser.add_argument('-spec_file', help='Path to spec file.')
     args = parser.parse_args()

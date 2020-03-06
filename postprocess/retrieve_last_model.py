@@ -14,7 +14,7 @@ def main():
             if int(m.group('epoch')) > epoch:
                 epoch = int(m.group('epoch'))
     if epoch != -1:
-        model = f'model_state_epoch_{str(epoch)}'
+        model = f'model_state_epoch_{str(epoch)}.th'
         print(f'Copying model {model} as pick.th.')
         shutil.copy(str(model_folder / model), str(model_folder / 'pick.th'))
     else:
