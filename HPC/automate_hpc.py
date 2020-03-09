@@ -56,7 +56,7 @@ def create_sh(mode, param):
                       f'-model $MODEL/pick.th ' \
                       f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
                       f'-output_path ' \
-                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_last.out -batch_size 48 --cuda'
+                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_last.out -batch_size 48 --cuda\n'
         output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
                       f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
                       f'-model $MODEL/best.th ' \
