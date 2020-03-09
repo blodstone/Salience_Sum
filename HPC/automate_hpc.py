@@ -62,7 +62,7 @@ def create_sh(mode, param):
                       f'-model $MODEL/best.th ' \
                       f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
                       f'-output_path ' \
-                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_best.out -batch_size 48 --cuda'
+                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_best.out -batch_size 48 --cuda\n'
         seed_str = f'export RANDOM_SEED={seed}\n' \
                    f'export NUMPY_SEED={seed}\n' \
                    f'export PYTORCH_SEED={seed}'
