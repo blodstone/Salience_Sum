@@ -33,7 +33,7 @@ def create_sh(mode, param):
         if line.strip() == '':
             continue
         package, jsonnet, model, server, dataset, seed = line.split(',')
-        seed = seed.trim()
+        seed = seed.strip()
         train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
         test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
         validation_path = data_path / dataset / 'ready' / 'validation.salience.tsv'
