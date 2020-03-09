@@ -36,6 +36,9 @@ def create_sh(mode, param):
         train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
         test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
         validation_path = data_path / dataset / 'ready' / 'validation.salience.tsv'
+        json_path = f'/home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet}'
+        if param == '-r':
+            json_path = f'/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}/config.json'
         output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
         output_str += f'DATA={str(data_path)}/{dataset}\n'
         output_str += 'module load apps/python/conda\n'
@@ -46,14 +49,20 @@ def create_sh(mode, param):
         output_str += f'allennlp train -s $MODEL {param} ' \
                       f'--file-friendly-logging ' \
                       f'--include-package {package} ' \
-                      f'/home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet}\n'
+                      f'{json_path}\n'
         output_str += f'python /home/acp16hh/Salience_Sum/postprocess/retrieve_last_model.py $MODEL\n'
         output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
                       f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
                       f'-model $MODEL/pick.th ' \
                       f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
                       f'-output_path ' \
-                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}.out -batch_size 24'
+                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_last.out -batch_size 48 --cuda'
+        output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
+                      f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
+                      f'-model $MODEL/best.th ' \
+                      f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
+                      f'-output_path ' \
+                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_best.out -batch_size 48 --cuda'
         seed_str = f'export RANDOM_SEED={seed}\n' \
                    f'export NUMPY_SEED={seed}\n' \
                    f'export PYTORCH_SEED={seed}'
