@@ -222,7 +222,8 @@ class EncoderDecoder(Model):
             final_context_state.size(0),
             final_context_state.size(2))  # (B, L, Num Direction * D_h)
         state['states_features'] = states_features  # (B, L, Num Direction * D_h)
-        state['emb_salience_feature'] = emb_salience_feature  # (B, L, EmbDim)
+        if emb_salience_feature is not None:
+            state['emb_salience_feature'] = emb_salience_feature  # (B, L, EmbDim)
         assert state['encoder_states'].size(2) == self.hidden_size
         return state
 

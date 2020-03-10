@@ -66,7 +66,10 @@ class Decoder(Module, Registrable):
         max_oov = state['max_oov']
         states = state['encoder_states']
         states_features = state['states_features']
-        emb_salience_feature = state['emb_salience_feature']
+        if 'emb_salience_feature' in state.keys():
+            emb_salience_feature = state['emb_salience_feature']
+        else:
+            emb_salience_feature = None
         hidden = state['hidden']
         context = state['context']
         source_mask = state['source_mask']
