@@ -33,6 +33,9 @@ def create_sh(mode, param):
         if line.strip() == '':
             continue
         package, jsonnet, model, server, dataset, seed = line.split(',')
+        use_salience = '--use_salience'
+        if 'clean' in jsonnet:
+            use_salience = ''
         seed = seed.strip()
         train_path = data_path / dataset / 'ready' / 'train.salience.tsv'
         test_path = data_path / dataset / 'ready' / 'test.salience.tsv'
@@ -42,28 +45,34 @@ def create_sh(mode, param):
             json_path = f'/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}/config.json'
         output_str = f'MODEL=/data/acp16hh/Exp_Gwen_Saliency/{package}/{dataset}/{server}/{model}/{seed}\n'
         output_str += f'DATA={str(data_path)}/{dataset}\n'
+        output_str += f'OUTPUT={str(data_path)}/result\n'
         output_str += 'module load apps/python/conda\n'
         output_str += 'module libs/cudnn/7.6.5.32/binary-cuda-10.0.130\n'
         output_str += 'source activate gwen\n'
         output_str += f'export train_path={str(train_path)}\n'
         output_str += f'export validation_path={str(validation_path)}\n'
-        output_str += f'allennlp train -s $MODEL {param} ' \
-                      f'--file-friendly-logging ' \
-                      f'--include-package {package} ' \
-                      f'{json_path}\n'
-        output_str += f'python /home/acp16hh/Salience_Sum/postprocess/retrieve_last_model.py $MODEL\n'
-        output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
-                      f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
-                      f'-model $MODEL/pick.th ' \
-                      f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
-                      f'-output_path ' \
-                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_last.out -batch_size 48 --cuda\n'
-        output_str += f'python /home/acp16hh/Salience_Sum/summarize.py -module {package} ' \
-                      f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
-                      f'-model $MODEL/best.th ' \
-                      f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
-                      f'-output_path ' \
-                      f'$DATA/result/test_{package}_{dataset}_{server}_{model}_best.out -batch_size 48 --cuda\n'
+        if not args.summarizer_only:
+            output_str += f'allennlp train -s $MODEL {param} ' \
+                          f'--file-friendly-logging ' \
+                          f'--include-package {package} ' \
+                          f'{json_path}\n'
+        if args.last_summary:
+            output_str += f'python /home/acp16hh/Salience_Sum/postprocess/retrieve_last_model.py $MODEL\n'
+            output_str += f'python /home/acp16hh/Salience_Sum/summarize.py ' \
+                          f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
+                          f'-model $MODEL/pick.th ' \
+                          f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
+                          f'-output_path ' \
+                          f'$DATA/result/test_{package}_{dataset}_{server}_{model}_{seed}_last.out -batch_size 48 ' \
+                          f'--cuda {use_salience}\n '
+        if args.best_summary:
+            output_str += f'python /home/acp16hh/Salience_Sum/summarize.py ' \
+                          f'-input {str(test_path)} -vocab_path $MODEL/vocabulary ' \
+                          f'-model $MODEL/best.th ' \
+                          f'-model_config /home/acp16hh/Salience_Sum/HPC/{package}/{jsonnet} ' \
+                          f'-output_path ' \
+                          f'$DATA/result/test_{package}_{dataset}_{server}_{model}_{seed}_best.out -batch_size 48 ' \
+                          f'--cuda {use_salience}\n '
         seed_str = f'export RANDOM_SEED={seed}\n' \
                    f'export NUMPY_SEED={seed}\n' \
                    f'export PYTORCH_SEED={seed}'
@@ -141,6 +150,9 @@ if __name__ == '__main__':
     parser.add_argument('--sharc', help='Run script for sharc only.', action='store_true')
     parser.add_argument('--dgx', help='Run script for dgx only.', action='store_true')
     parser.add_argument('--force', help='Apply -f to allennlp training. Will delete the data.', action='store_true')
+    parser.add_argument('--best_summary', help='Run best.th summarizer.', action='store_true')
+    parser.add_argument('--last_summary', help='Run last model summarizer.', action='store_true')
+    parser.add_argument('--summarizer_only', help='Only run summarizer.', action='store_true')
     parser.add_argument('-data_path', help='Data path.')
     parser.add_argument('-spec_file', help='Path to spec file.')
     args = parser.parse_args()
