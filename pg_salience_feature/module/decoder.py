@@ -13,10 +13,12 @@ class Decoder(Module, Registrable):
                  input_size: int,
                  hidden_size: int,
                  is_emb_attention: bool = False,
+                 use_copy_mechanism: bool = True,
                  emb_attention_mode: str = 'mlp',
                  attention: Attention = None,
                  training: bool = True) -> None:
         super().__init__()
+        self.use_copy_mechanism = use_copy_mechanism
         self.emb_attention_mode = emb_attention_mode
         self.is_emb_attention = is_emb_attention
         self.vocab = None
@@ -100,8 +102,11 @@ class Decoder(Module, Registrable):
             input_feed = rnn_output
 
         if self.is_attention:
-            state['class_probs'], state['p_gen'] = self._build_class_logits(
-                attention, decoder_output, final_hat, rnn_output, x, source_ids, max_oov)
+            if self.use_copy_mechanism:
+                state['class_probs'], state['p_gen'] = self._build_class_logits(
+                    attention, decoder_output, final_hat, rnn_output, x, source_ids, max_oov)
+            else:
+                state['class_probs'], state['p_gen'] = self._build_class_logits_no_copy(decoder_output, rnn_output)
         else:
             state['class_probs'], state['p_gen'] = self._build_class_logits_no_attn(decoder_output)
         state['coverage'] = coverage
@@ -110,6 +115,14 @@ class Decoder(Module, Registrable):
         state['hidden'] = final[0].view(batch_size, 1, self.hidden_size)
         state['context'] = final[1].view(batch_size, 1, self.hidden_size)
         return state
+
+    def _build_class_logits_no_copy(self,
+                                    decoder_output: torch.Tensor,
+                                    rnn_output: torch.Tensor):
+        out = torch.cat((decoder_output, rnn_output), dim=2)
+        vocab_dist = self.gen_vocab_dist(out)
+        p_gen = decoder_output.new_zeros((decoder_output.size(0), 1, 1))
+        return vocab_dist, p_gen
 
     def _build_class_logits(self,
                             attention: torch.Tensor,

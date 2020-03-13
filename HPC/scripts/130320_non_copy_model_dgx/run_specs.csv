@@ -1,0 +1,9 @@
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp.jsonnet,seq2seq_emb_mlp_16,dgx,bbc,300
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp_attn.jsonnet,seq2seq_emb_mlp_attn_16,dgx,bbc,300
+pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,cnn,300
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp.jsonnet,seq2seq_emb_mlp_16,dgx,bbc,200
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp_attn.jsonnet,seq2seq_emb_mlp_attn_16,dgx,bbc,200
+pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,cnn,200
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp.jsonnet,seq2seq_emb_mlp_16,dgx,bbc,100
+pg_salience_feature,batch_16/seq2seq_salience_emb_mlp_attn.jsonnet,seq2seq_emb_mlp_attn_16,dgx,bbc,100
+pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,cnn,100

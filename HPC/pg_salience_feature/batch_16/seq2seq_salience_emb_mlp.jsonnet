@@ -33,6 +33,7 @@ local CUDA=0;
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
+      "use_copy_mechanism": false,
       "is_emb_attention": false,
       "emb_attention_mode": "mlp",
     },

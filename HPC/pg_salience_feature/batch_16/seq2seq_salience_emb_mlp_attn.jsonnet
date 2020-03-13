@@ -29,11 +29,12 @@ local CUDA=0;
     "decoder": {
       "attention": {
         "hidden_size": HIDDEN,
-        "bidirectional": true
+        "bidirectional": true,
       },
       "input_size": EMBEDDING,
       "hidden_size": HIDDEN,
-      "is_emb_attention": false,
+      "use_copy_mechanism": false,
+      "is_emb_attention": true,
       "emb_attention_mode": "mlp",
     },
     "salience_source_mixer":{

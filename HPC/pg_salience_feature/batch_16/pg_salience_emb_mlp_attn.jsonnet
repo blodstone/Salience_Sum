@@ -25,17 +25,6 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
-    "salience_source_mixer":{
-      "type": "emb_mlp",
-      "embedding_size": EMBEDDING,
-      "feature_size": FEATURE,
-      "hidden_size": HIDDEN,
-      "salience_embedder": {
-        "embedding_size": EMBEDDING,
-        "feature_size": FEATURE,
-        "type": "vector",
-      },
-    },
     "teacher_force_ratio": 0.7,
     "decoder": {
       "attention": {
@@ -46,6 +35,17 @@ local CUDA=0;
       "hidden_size": HIDDEN,
       "is_emb_attention": true,
       "emb_attention_mode": "mlp",
+    },
+    "salience_source_mixer":{
+      "type": "emb_mlp",
+      "embedding_size": EMBEDDING,
+      "feature_size": FEATURE,
+      "hidden_size": HIDDEN,
+      "salience_embedder": {
+        "embedding_size": EMBEDDING,
+        "feature_size": FEATURE,
+        "type": "vector",
+      },
     },
     "coverage_lambda": 0.0,
     "max_steps": 100,

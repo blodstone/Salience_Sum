@@ -1,5 +1,0 @@
-from pointer_generator_salience.model.encoder_decoder import EncoderDecoder
-from pointer_generator_salience.module.encoder import Encoder
-from pointer_generator_salience.module.decoder import Decoder
-from pointer_generator_salience.predictor.pg_predictor import Seq2SeqPredictor
-from pointer_generator_salience.reader.summ_reader import SummDataReader
