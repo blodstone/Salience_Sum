@@ -87,12 +87,14 @@ class EncoderDecoder(Model):
                  decoder: Decoder,
                  vocab: Vocabulary,
                  teacher_force_ratio: float,
+                 use_copy_mechanism: bool = True,
                  salience_source_mixer: SalienceSourceMixer = None,
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
         # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
         self.salience_source_mixer = salience_source_mixer
         self.coverage_lambda = coverage_lambda
+        self.use_copy_mechanism = use_copy_mechanism
         if coverage_lambda == 0.0:
             self.is_coverage = False
         else:
@@ -188,6 +190,8 @@ class EncoderDecoder(Model):
 
         if target_tokens:
             state = self._decode(source_ids, target_tokens, state)
+            if not self.use_copy_mechanism:
+                target_ids = target_tokens['tokens']
             output_dict['loss'] = self._compute_loss(target_tokens, target_ids, state)
 
         if not self.training and not target_tokens:

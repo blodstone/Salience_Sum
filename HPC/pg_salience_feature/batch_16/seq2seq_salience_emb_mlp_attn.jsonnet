@@ -25,6 +25,7 @@ local CUDA=0;
       "num_layers": 1,
       "bidirectional": true
     },
+    "use_copy_mechanism": false,
     "teacher_force_ratio": 0.7,
     "decoder": {
       "attention": {
