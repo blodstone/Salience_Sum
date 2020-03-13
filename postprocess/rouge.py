@@ -2,24 +2,27 @@
 import argparse
 import os
 import time
+from pathlib import Path
+from multiprocessing import Pool
 import pyrouge
 import shutil
 import sys
 import codecs
 
 
-def rouge(cand, ref):
+def rouge(file_input):
     """Calculate ROUGE scores of sequences passed as an iterator
        e.g. a list of str, an open file, StringIO or even sys.stdin
     """
+    name, ref, cand = file_input
     current_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())
-    tmp_dir = ".rouge-tmp-{}".format(current_time)
+    tmp_dir = ".rouge-tmp-{}-{}".format(current_time, name)
     try:
         if not os.path.isdir(tmp_dir):
             os.mkdir(tmp_dir)
             os.mkdir(tmp_dir + "/candidate")
             os.mkdir(tmp_dir + "/reference")
-        candidates = [line.strip() for line in cand]
+        candidates = [line.strip() for line in cand if line.strip() != '']
         references = [line.strip().split('\t')[1] for line in ref if line.strip() != '']
         assert len(candidates) == len(references), f'{len(candidates)}, {len(references)}'
         cnt = len(candidates)
@@ -42,6 +45,7 @@ def rouge(cand, ref):
         rouge_results = r.convert_and_evaluate()
         # print(rouge_results)
         results_dict = r.output_to_dict(rouge_results)
+        results_dict['name'] = name
         return results_dict
     finally:
         pass
@@ -50,7 +54,8 @@ def rouge(cand, ref):
 
 
 def rouge_results_to_str(results_dict):
-    return ">> ROUGE(1/2/3/L/SU4): {:.2f}/{:.2f}/{:.2f}/{:.2f}/{:.2f}".format(
+    return "{},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}\n".format(
+        results_dict['name'],
         results_dict["rouge_1_f_score"] * 100,
         results_dict["rouge_2_f_score"] * 100,
         results_dict["rouge_3_f_score"] * 100,
@@ -60,16 +65,35 @@ def rouge_results_to_str(results_dict):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('-f', help='folder containing candidate files.', default='')
     parser.add_argument('-c', type=str, default="candidate.txt",
                         help='candidate file (TXT format)')
     parser.add_argument('-r', type=str, default="reference.tsv",
                         help='reference file (TSV format)')
+    parser.add_argument('-o', type=str, help='output path.')
+    parser.add_argument('-n', type=str, help='output filename.')
     args = parser.parse_args()
-    if args.c.upper() == "STDIN":
-        candidates = sys.stdin
-    else:
-        candidates = codecs.open(args.c, encoding="utf-8")
-    references = codecs.open(args.r, encoding="utf-8")
 
-    results_dict = rouge(candidates, references)
-    print(rouge_results_to_str(results_dict))
+    results = []
+    if args.f == '':
+        if args.c.upper() == "STDIN":
+            candidates = sys.stdin
+        else:
+            candidates = codecs.open(args.c, encoding="utf-8")
+        references = codecs.open(args.r, encoding="utf-8")
+        results.append(rouge((Path(args.f).stem, references, candidates)))
+    else:
+        input_folder = Path(args.f)
+        inputs = []
+        for f in input_folder.iterdir():
+            inputs.append((f.stem,
+                           codecs.open(args.r, encoding="utf-8").readlines(),
+                           f.open(encoding='utf-8').readlines()))
+        with Pool(16) as p:
+            results = p.map(rouge, inputs)
+
+    output_path = Path(args.o)
+    (output_path / args.n).open('w').write('')
+    (output_path / args.n).open('a').write('Name,R1,R2,R3,RL,RSU4\n')
+    for result in results:
+        (output_path / args.n).open('a').write(rouge_results_to_str(result))

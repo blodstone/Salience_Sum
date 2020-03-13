@@ -55,7 +55,7 @@ if __name__ == "__main__":
     results = ['Name, R1_p, R1_r, R1_f, R2_p, R2_r, R2_f, RL_p, RL_r, RL_f']
     for f in input_folder.iterdir():
         print(f'Processing file {f.stem}')
-        candidates = f.open().readlines()
+        candidates = f.open(encoding='utf-8').readlines()
         results.append(rouge(candidates, references, f.stem))
     output_path = Path(args.o)
     (output_path / args.n).open('w').write('\n'.join(results))
