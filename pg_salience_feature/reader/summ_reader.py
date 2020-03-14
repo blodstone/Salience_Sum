@@ -29,14 +29,14 @@ class SummDataReader(DatasetReader):
         self._interpolation = interpolation
         self._use_salience = use_salience
 
-    def process_line(self, line):
-        src_seq, tgt_seq = line.split('\t')
+    def process_line(self, src_seq, tgt_seq):
         return_res = []
         collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
         src_seq = collection_seq[0]
         return_res.append([Token(token) for token in src_seq])
         if self._use_salience:
-            salience_seqs = [[float(value) if float(value) <= 1.0 else 1.0 for value in seq] for seq in collection_seq[1:]]
+            salience_seqs = [[float(value) if float(value) <= 1.0 else 1.0 for value in seq] for seq in
+                             collection_seq[1:]]
 
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
@@ -54,7 +54,11 @@ class SummDataReader(DatasetReader):
                 line = line.strip()
                 if line == '':
                     continue
-                yield self.text_to_instance(*self.process_line(line))
+                try:
+                    src_seq, tgt_seq = line.split('\t')
+                except ValueError:
+                    continue
+                yield self.text_to_instance(*self.process_line(src_seq, tgt_seq))
 
     def smooth_and_norm(self, value):
         value_dict = {i: x for i, x in enumerate(value) if x != 0}
@@ -70,7 +74,7 @@ class SummDataReader(DatasetReader):
         ids = {}
         out = []
         for token in tokens:
-            out.append(ids.setdefault(token.text.lower(), len(ids)+1))
+            out.append(ids.setdefault(token.text.lower(), len(ids) + 1))
         return out
 
     def text_to_instance(self, src_seq: List[Token], tgt_seq: List[Token] = None,
@@ -83,7 +87,7 @@ class SummDataReader(DatasetReader):
         source_text_field = MetadataField(metadata=tokenized_src)
         source_ids_field = CopyField(tokenized_src)
 
-            # ArrayField(np.array(self.text_to_ids(tokenized_src)))
+        # ArrayField(np.array(self.text_to_ids(tokenized_src)))
         output_field = {
             'source_tokens': source_field,
             'source_text': source_text_field,
