@@ -1,3 +1,6 @@
 pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,bbc,300
+pg_salience_feature,batch_16/pg_clean.jsonnet,pg_clean_16,dgx,cnn,100
 pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,bbc,200
+pg_salience_feature,batch_16/pg_clean.jsonnet,pg_clean_16,dgx,cnn,200
 pg_salience_feature,batch_16/seq2seq_clean.jsonnet,seq2seq_clean_16,dgx,bbc,100
+pg_salience_feature,batch_16/pg_clean.jsonnet,pg_clean_16,dgx,cnn,300
