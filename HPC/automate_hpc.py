@@ -139,7 +139,7 @@ def build_run_job(s, mode, last_i):
     jt.remoteCommand = str(output_path / f'jobs_{script_name}_{mode}.sh')
     if mode == 'sharc':
         if args.summarizer_only:
-            jt.nativeSpecification = '-P gpu -l gpu=1 -l rmem=13G'
+            jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=13G'
         else:
             jt.nativeSpecification = '-P gpu -l gpu=1 -tc 5 -l rmem=36G -l h_rt=72:00:00'
     elif mode == 'dgx':
