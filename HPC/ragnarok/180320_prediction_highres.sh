@@ -4,7 +4,7 @@ HOME=/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency/src/SalienceS
 DATA=$HOME/data/bbc
 source $HOME/venv/bin/activate
 
-python python $HOME/preprocess/convert/tag_highres.py
+python $HOME/preprocess/convert/tag_highres.py
 
 MODEL=$HOME/model/bbc/seq2seq_emb_mlp_16/200
 python $HOME/postprocess/retrieve_last_model.py $MODEL
