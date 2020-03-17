@@ -47,6 +47,8 @@ def rouge(file_input):
         results_dict = r.output_to_dict(rouge_results)
         results_dict['name'] = name
         return results_dict
+    except:
+        return None
     finally:
         pass
         if os.path.isdir(tmp_dir):
@@ -96,4 +98,5 @@ if __name__ == "__main__":
     (output_path / args.n).open('w').write('')
     (output_path / args.n).open('a').write('Name,R1,R2,R3,RL,RSU4\n')
     for result in results:
-        (output_path / args.n).open('a').write(rouge_results_to_str(result))
+        if result is not None:
+            (output_path / args.n).open('a').write(rouge_results_to_str(result))
