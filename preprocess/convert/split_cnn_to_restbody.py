@@ -30,10 +30,10 @@ def split_file(path, name, i, index_json, output_path):
         if line.strip() == '':
             continue
         src, tgt = line.split('\t')
-
         index_json[name].append(i)
-        (docs_path / f'{str(i)}.txt').open('w').write(src)
-        (summaries_path / f'{str(i)}.txt').open('w').write(tgt)
+        if not args.json_only:
+            (docs_path / f'{str(i)}.txt').open('w').write(src)
+            (summaries_path / f'{str(i)}.txt').open('w').write(tgt)
         i += 1
     return i, index_json
 
@@ -42,5 +42,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-input_path', help='The path containing test, train and validation.')
     parser.add_argument('-output_path', help='The output path.')
+    parser.add_argument('--json_only', help='Produce json only.')
     args = parser.parse_args()
     main()

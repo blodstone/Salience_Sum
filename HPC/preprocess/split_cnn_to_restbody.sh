@@ -8,4 +8,4 @@
 module load apps/python/conda
 source activate gwen
 
-python preprocess/convert/split_cnn_to_restbody.py -input_path /data/acp16hh/data/cnn/ready -output_path /data/acp16hh/data/cnn/raw
+python preprocess/convert/split_cnn_to_restbody.py -input_path /data/acp16hh/data/cnn/ready -output_path /data/acp16hh/data/cnn/raw --json_only
