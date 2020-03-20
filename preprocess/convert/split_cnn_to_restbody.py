@@ -42,6 +42,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-input_path', help='The path containing test, train and validation.')
     parser.add_argument('-output_path', help='The output path.')
-    parser.add_argument('--json_only', help='Produce json only.')
+    parser.add_argument('--json_only', help='Produce json only.', action='store_true')
     args = parser.parse_args()
     main()
