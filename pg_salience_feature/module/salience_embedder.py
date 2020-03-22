@@ -39,7 +39,8 @@ class SalienceEmbedderVector(SalienceEmbedder):
     def forward(self, salience_values: torch.Tensor):
         embs = torch.zeros(salience_values.size(0), salience_values.size(1), 1,
                            device=salience_values.device, dtype=torch.long)
-        sum_salience_values = salience_values.sum(dim=2)
-        for i, salience_value in enumerate(sum_salience_values.unsqueeze(2).split(1, 2)):
-            embs += pow(2, salience_value) - 1
+        # sum_salience_values = salience_values.sum(dim=2)
+        for i, salience_value in enumerate(salience_values.split(1, 1)):
+            for j, value in enumerate(salience_value.split(1, 2)):
+                embs[:, i, 0] += pow(2, j) * value.squeeze()
         return self.embedders(embs).squeeze()

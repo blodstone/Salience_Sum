@@ -489,3 +489,4 @@ dmypy.json
 *.png
 
 data/
+/HPC/local/
