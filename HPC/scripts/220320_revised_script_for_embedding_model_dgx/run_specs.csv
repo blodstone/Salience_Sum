@@ -1,0 +1,6 @@
+pg_salience_feature,batch_16/pg_salience_emb_mlp_attn.jsonnet,salience_emb_attn_16,dgx,bbc,400
+pg_salience_feature,batch_16/pg_salience_attn.jsonnet,salience_attn_16,dgx,bbc,400
+pg_salience_feature,batch_16/pg_salience_emb_mlp.jsonnet,emb_mlp_16,dgx,bbc,400
+pg_salience_feature,batch_16/pg_salience_emb_mlp_attn.jsonnet,salience_emb_attn_16,dgx,bbc,500
+pg_salience_feature,batch_16/pg_salience_attn.jsonnet,salience_attn_16,dgx,bbc,500
+pg_salience_feature,batch_16/pg_salience_emb_mlp.jsonnet,emb_mlp_16,dgx,bbc,500
