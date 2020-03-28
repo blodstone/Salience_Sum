@@ -488,5 +488,5 @@ dmypy.json
 # Matplotlib output
 *.png
 
-data/
-/HPC/local/
+/data
+/HPC/local_ignore/
