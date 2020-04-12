@@ -12,6 +12,7 @@ from torch.distributions import Categorical, Gumbel
 from torch.nn import CrossEntropyLoss, Softmax, MSELoss, NLLLoss
 
 from pg_salience_feature.module.beam_search import BeamSearch
+from pg_salience_feature.module.constrained_beam_search import ConstrainedBeamSearch
 from pg_salience_feature.module.decoder import Decoder
 from pg_salience_feature.module.encoder import Encoder
 
@@ -50,6 +51,7 @@ class EncoderDecoder(Model):
                              source_ids: Dict[str, torch.Tensor], source_text: List[List[str]]) -> Dict[str, List]:
         """Make forward pass during prediction using a beam search."""
         state = self.init_dec_state(state)
+        state['constraint_idxs'] = torch.Tensor()
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
         batch_size = state["source_mask"].size()[0]
@@ -114,7 +116,7 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = BeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
+        self.beam = ConstrainedBeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
