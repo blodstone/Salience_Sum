@@ -20,7 +20,7 @@ def count_score(tracker, score):
 
 def allocate_beam(scores, topk_index, bin_size, beam_size, bid):
     bin_idx = 0
-    allocate_bin = 0
+    allocate_bin = 1
     allocate_index = []
     active_beam = 1
     for item, score in scores:
