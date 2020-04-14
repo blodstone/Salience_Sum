@@ -32,7 +32,7 @@ def allocate_beam(scores, topk_index, bin_size, beam_size, bid):
                 allocate_bin += 1
     i = 0
     while active_beam <= beam_size:
-        item = topk_index[i].item()
+        item = topk_index[i]
         index = hash((bid, item))
         if index not in allocate_index:
             allocate_index.append(index)
@@ -200,16 +200,17 @@ class ConstrainedBeamSearch:
             select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]],
                                         dtype=torch.long, device=start_class_log_probabilities.device)
             select_index = torch.cat([select_index, topk_index.squeeze()]).unique()
+            topk_index = topk_index.tolist()
             # (3) Expand and update trackers
             new_tracker_candidates = {}
             new_tracker_scores = {}
-            for i, idx in enumerate(select_index):
-                hash_to_idx[hash((bid, idx.item()))] = idx.item()
-                new_tracker_candidates[hash((bid, idx.item()))] = copy.deepcopy(trackers[bid])
-                if idx.item() in trackers[bid]:
-                    new_tracker_candidates[hash((bid, idx.item()))][idx.item()] = True
-                    new_tracker_scores[hash((bid, idx.item()))] = \
-                        count_score(new_tracker_candidates[hash((bid, idx.item()))], scores[batch])
+            for i, idx in enumerate(select_index.tolist()):
+                hash_to_idx[hash((bid, idx))] = idx
+                new_tracker_candidates[hash((bid, idx))] = copy.deepcopy(trackers[bid])
+                if idx in trackers[bid]:
+                    new_tracker_candidates[hash((bid, idx))][idx] = True
+                    new_tracker_scores[hash((bid, idx))] = \
+                        count_score(new_tracker_candidates[hash((bid, idx))], scores[batch])
             new_tracker_scores = sorted(new_tracker_scores.items(), key=lambda item: item[1])
 
             # (4) Obtain selected hash index
@@ -217,7 +218,7 @@ class ConstrainedBeamSearch:
             # (5) Remove hash index that is not in used
             candidates.update({a_hash: new_tracker_candidates[a_hash] for a_hash in start_hash_index})
             predictions_idx_to_hash.update(
-                {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
+                {idx: hash for hash, idx in hash_to_idx if hash in start_hash_index})
             start_predicted_class = torch.tensor(
                 [hash_to_idx[a_hash] for a_hash in start_hash_index],
                 dtype=torch.long, device=start_class_log_probabilities.device)
@@ -310,17 +311,17 @@ class ConstrainedBeamSearch:
                 select_index = torch.cat([select_index, predicted_class.squeeze()]).unique()
                 new_tracker_candidates = {}
                 new_tracker_scores = {}
-                for i, idx in enumerate(select_index):
-                    hash_to_idx[hash((bid, idx.item()))] = idx.item()
-                    new_tracker_candidates[hash((bid, idx.item()))] = copy.deepcopy(trackers[bid])
-                    if idx.item() in trackers[bid]:
-                        new_tracker_candidates[hash((bid, idx.item()))][idx.item()] = True
-                        new_tracker_scores[hash((bid, idx.item()))] = \
-                            count_score(new_tracker_candidates[hash((bid, idx.item()))],
+                for i, idx in enumerate(select_index.tolist()):
+                    hash_to_idx[hash((bid, idx))] = idx
+                    new_tracker_candidates[hash((bid, idx))] = copy.deepcopy(trackers[bid])
+                    if idx in trackers[bid]:
+                        new_tracker_candidates[hash((bid, idx))][idx] = True
+                        new_tracker_scores[hash((bid, idx))] = \
+                            count_score(new_tracker_candidates[hash((bid, idx))],
                                         scores_hash[
-                                            hash(tuple(new_tracker_candidates[hash((bid, idx.item()))].keys()))])
+                                            hash(tuple(new_tracker_candidates[hash((bid, idx))].keys()))])
                 new_tracker_scores = sorted(new_tracker_scores.items(), key=lambda item: item[1])
-                start_hash_index = allocate_beam(new_tracker_scores, predicted_class.squeeze(), bin_size, self.beam_size, bid)
+                start_hash_index = allocate_beam(new_tracker_scores, predicted_class.squeeze().tolist(), bin_size, self.beam_size, bid)
                 candidates.update({a_hash: new_tracker_candidates[a_hash] for a_hash in start_hash_index})
                 predictions_idx_to_hash.update(
                     {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
