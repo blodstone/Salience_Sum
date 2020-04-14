@@ -31,7 +31,7 @@ class EncoderDecoder(Model):
     def build_constraints(self, salience_values, source_text):
         vocab_to_idx = self.vocab.get_token_to_index_vocabulary()
         # num_of_tokens = math.floor(0.8 * self.beam_size)
-        num_of_tokens = 4
+        num_of_tokens = self.beam_size
         salience_values_sum = salience_values.sum(dim=2)
         stopword_set = set(stopwords.words('english'))
         constraints = []
