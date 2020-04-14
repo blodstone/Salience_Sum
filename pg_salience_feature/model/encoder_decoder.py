@@ -1,6 +1,9 @@
+import math
 from typing import Dict, Tuple, Any, List
 
 import torch
+import nltk
+from nltk.corpus import stopwords
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data import Vocabulary
 from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, DEFAULT_OOV_TOKEN
@@ -25,6 +28,32 @@ from pg_salience_feature.module.salience_src_mixer import SalienceSourceMixer
 @Model.register("enc_dec_salience_feature")
 class EncoderDecoder(Model):
 
+    def build_constraints(self, salience_values, source_text):
+        vocab_to_idx = self.vocab.get_token_to_index_vocabulary()
+        num_of_tokens = math.floor(0.8 * self.beam_size)
+        salience_values_sum = salience_values.sum(dim=2)
+        stopword_set = set(stopwords.words('english'))
+        constraints = []
+        word_constraints = []
+        for salience, doc in zip(salience_values_sum.split(1, 0), source_text):
+            salience = salience.squeeze()
+            word_salience = sorted([(salience[i], word) for i, word in enumerate(doc)],
+                                   key=lambda item: item[0], reverse=True)
+            constraint = []
+            word_constraint = []
+            for _, word in word_salience:
+                word = word.text.lower()
+                if word in stopword_set or word in word_constraint or word not in vocab_to_idx:
+                    continue
+                else:
+                    constraint.append(vocab_to_idx[word])
+                    word_constraint.append(word)
+                if len(constraint) == num_of_tokens:
+                    break
+            word_constraints.append(word_constraint)
+            constraints.append(constraint)
+        return constraints, word_constraints
+
     def init_enc_state(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         source_mask = util.get_text_field_mask(source_tokens)
         source_lengths = get_lengths_from_binary_sequence_mask(source_mask)
@@ -48,10 +77,11 @@ class EncoderDecoder(Model):
 
     def _forward_beam_search(self,
                              state: Dict[str, torch.Tensor],
-                             source_ids: Dict[str, torch.Tensor], source_text: List[List[str]]) -> Dict[str, List]:
+                             source_ids: Dict[str, torch.Tensor],
+                             source_text: List[List[str]],
+                             constraints: List) -> Dict[str, List]:
         """Make forward pass during prediction using a beam search."""
         state = self.init_dec_state(state)
-        state['constraint_idxs'] = torch.Tensor()
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
         batch_size = state["source_mask"].size()[0]
@@ -60,7 +90,7 @@ class EncoderDecoder(Model):
         # shape (all_top_k_predictions): (batch_size, beam_size, num_decoding_steps)
         # shape (log_probabilities): (batch_size, beam_size)
         all_top_k_predictions, log_probabilities = self.beam.search(
-            start_predictions, state, self.take_step)
+            start_predictions, state, self.take_step, constraints)
         system_summaries = []
         for batch_prediction in all_top_k_predictions[:, 0, :].split(1, dim=1):
             predict_tokens = []
@@ -116,7 +146,8 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam = ConstrainedBeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=10)
+        self.beam_size = 10
+        self.beam = ConstrainedBeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=self.beam_size)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
@@ -197,7 +228,9 @@ class EncoderDecoder(Model):
             output_dict['loss'] = self._compute_loss(target_tokens, target_ids, state)
 
         if not self.training and not target_tokens:
-            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text)
+            constraints, word_constraints = self.build_constraints(salience_values, source_text)
+            output_dict['word_constraints'] = word_constraints
+            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text, constraints)
         return output_dict
 
     def _encode(self, source_tokens: Dict[str, torch.Tensor], salience_values: torch.Tensor) \
