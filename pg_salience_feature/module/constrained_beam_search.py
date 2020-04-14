@@ -218,7 +218,7 @@ class ConstrainedBeamSearch:
             # (5) Remove hash index that is not in used
             candidates.update({a_hash: new_tracker_candidates[a_hash] for a_hash in start_hash_index})
             predictions_idx_to_hash.update(
-                {idx: hash for hash, idx in hash_to_idx if hash in start_hash_index})
+                {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
             start_predicted_class = torch.tensor(
                 [hash_to_idx[a_hash] for a_hash in start_hash_index],
                 dtype=torch.long, device=start_class_log_probabilities.device)
