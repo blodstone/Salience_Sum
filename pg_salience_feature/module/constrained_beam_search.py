@@ -197,7 +197,8 @@ class ConstrainedBeamSearch:
             topk_log_prob, topk_index = beam.topk(self.beam_size)
 
             # (2) Unmet constraint
-            select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long)
+            select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]],
+                                        dtype=torch.long, device=start_class_log_probabilities.device)
             select_index = torch.cat([select_index, topk_index.squeeze()]).unique()
             # (3) Expand and update trackers
             new_tracker_candidates = {}
@@ -219,10 +220,10 @@ class ConstrainedBeamSearch:
                 {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
             start_predicted_class = torch.tensor(
                 [hash_to_idx[a_hash] for a_hash in start_hash_index],
-                dtype=torch.long)
+                dtype=torch.long, device=start_class_log_probabilities.device)
             start_predicted_hash = torch.tensor(
                 [a_hash for a_hash in start_hash_index],
-                dtype=torch.long)
+                dtype=torch.long, device=start_class_log_probabilities.device)
             start_top_log_probability = beam.gather(0, start_predicted_class)
             start_predicted_classes.append(start_predicted_class)
             start_predicted_hashes.append(start_predicted_hash)
@@ -304,7 +305,7 @@ class ConstrainedBeamSearch:
                     predicted_classes.split(1, 0)
             ):
                 bid = bid.item()
-                select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long)
+                select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long, device=start_class_log_probabilities.device)
                 select_index = torch.cat([select_index, predicted_class.squeeze()]).unique()
                 new_tracker_candidates = {}
                 new_tracker_scores = {}
@@ -324,10 +325,10 @@ class ConstrainedBeamSearch:
                     {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
                 next_predicted_class = torch.tensor(
                     [hash_to_idx[a_hash] for a_hash in start_hash_index],
-                    dtype=torch.long)
+                    dtype=torch.long, device=start_class_log_probabilities.device)
                 next_predicted_hash = torch.tensor(
                     [a_hash for a_hash in start_hash_index],
-                    dtype=torch.long)
+                    dtype=torch.long, device=start_class_log_probabilities.device)
                 next_top_log_probability = beam.squeeze().gather(0, next_predicted_class)
                 next_predicted_classes.append(next_predicted_class)
                 next_predicted_hashes.append(next_predicted_hash)
