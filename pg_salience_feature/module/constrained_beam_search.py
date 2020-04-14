@@ -20,16 +20,17 @@ def count_score(tracker, score):
 
 def allocate_beam(scores, topk_index, bin_size, beam_size, bid):
     bin_idx = 0
-    allocate_bin = 1
+    allocate_bin = 0
     allocate_index = []
     active_beam = 1
     for item, score in scores:
         if active_beam <= beam_size and score == allocate_bin:
             allocate_index.append(item)
             active_beam += 1
-            if bin_idx + 1 == bin_size:
-                bin_idx = 0
-                allocate_bin += 1
+        if bin_idx + 1 == bin_size:
+            bin_idx = 0
+            allocate_bin += 1
+        bin_idx += 1
     i = 0
     while active_beam <= beam_size:
         item = topk_index[i]
