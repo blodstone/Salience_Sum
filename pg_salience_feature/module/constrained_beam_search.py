@@ -129,7 +129,7 @@ class ConstrainedBeamSearch:
         trackers = {}
         scores_hash = {}
         scores = []
-        num_constraints = []
+        num_constraints = {}
         for i, batch in enumerate(constraints):
             multi = dict()
             tracker = {}
@@ -147,7 +147,7 @@ class ConstrainedBeamSearch:
                         a_score.update({c: 1})
                         tracker.update({c: False})
                         num_constraint += 1
-            num_constraints.append(num_constraint)
+            num_constraints[hash(tuple(tracker.keys()))] = num_constraint
             scores.append(a_score)
             scores_hash[hash(tuple(tracker.keys()))] = a_score
             trackers[hash(i)] = tracker
@@ -192,7 +192,7 @@ class ConstrainedBeamSearch:
         for bid, row in iter_items:
             batch = row
             beam = start_class_log_probabilities[row]
-            bin_size = math.floor(self.beam_size / num_constraints[batch]) or 1
+            bin_size = math.floor(self.beam_size / num_constraints[hash(tuple(trackers[bid].keys()))]) or 1
             # (1) The best k tokens across all rows of scores
             topk_log_prob, topk_index = beam.topk(self.beam_size)
 
@@ -305,6 +305,7 @@ class ConstrainedBeamSearch:
                     predicted_classes.split(1, 0)
             ):
                 bid = bid.item()
+                bin_size = math.floor(self.beam_size / num_constraints[hash(tuple(trackers[bid].keys()))]) or 1
                 select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long, device=start_class_log_probabilities.device)
                 select_index = torch.cat([select_index, predicted_class.squeeze()]).unique()
                 new_tracker_candidates = {}
