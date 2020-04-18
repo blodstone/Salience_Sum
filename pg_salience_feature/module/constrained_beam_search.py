@@ -27,18 +27,51 @@ def allocate_beam(scores, topk_index, bin_size, beam_size, bid):
         if active_beam <= beam_size and score == allocate_bin:
             allocate_index.append(item)
             active_beam += 1
-            if bin_idx + 1 == bin_size:
-                bin_idx = 0
-                allocate_bin += 1
+        if bin_idx + 1 == bin_size:
+            bin_idx = 0
+            allocate_bin += 1
+        bin_idx += 1
     i = 0
     while active_beam <= beam_size:
-        item = topk_index[i].item()
+        item = topk_index[i]
         index = hash((bid, item))
         if index not in allocate_index:
             allocate_index.append(index)
             active_beam += 1
         i += 1
     return allocate_index
+
+
+def init_global_tracker(batch_size, constraints):
+    # multi_parents = []
+    trackers = {}
+    scores_hash = {}
+    scores = []
+    num_constraints = {}
+    for i, batch in enumerate(constraints):
+        multi = dict()
+        tracker = {}
+        a_score = {}
+        num_constraint = 0
+        for c in batch:
+            if isinstance(c, list):
+                tracker.update({e: False for e in c})
+                a_score.update({e: 1 / len(c) for e in c})
+                num_constraint += 1
+                for j in range(len(c))[1:]:
+                    multi[c[j]] = c[j - 1]
+            else:
+                if c not in tracker:
+                    a_score.update({c: 1})
+                    tracker.update({c: False})
+                    num_constraint += 1
+        num_constraints[hash(tuple(tracker.keys()))] = num_constraint
+        scores.append(a_score)
+        scores_hash[hash(tuple(tracker.keys()))] = a_score
+        trackers[hash(i)] = tracker
+        # multi_parents.append(multi)
+    hash_to_idx = {hash(i): i for i in range(batch_size)}
+    return hash_to_idx, num_constraints, scores, scores_hash, trackers
 
 
 class ConstrainedBeamSearch:
@@ -125,34 +158,7 @@ class ConstrainedBeamSearch:
         batch_size = start_predictions.size()[0]
 
         # Boilerplate for constraint codes
-        multi_parents = []
-        trackers = {}
-        scores_hash = {}
-        scores = []
-        num_constraints = []
-        for i, batch in enumerate(constraints):
-            multi = dict()
-            tracker = {}
-            a_score = {}
-            num_constraint = 0
-            for c in batch:
-                if isinstance(c, list):
-                    tracker.update({e: False for e in c})
-                    a_score.update({e: 1 / len(c) for e in c})
-                    num_constraint += 1
-                    for j in range(len(c))[1:]:
-                        multi[c[j]] = c[j - 1]
-                else:
-                    if c not in tracker:
-                        a_score.update({c: 1})
-                        tracker.update({c: False})
-                        num_constraint += 1
-            num_constraints.append(num_constraint)
-            scores.append(a_score)
-            scores_hash[hash(tuple(tracker.keys()))] = a_score
-            trackers[hash(i)] = tracker
-            multi_parents.append(multi)
-        hash_to_idx = {hash(i): i for i in range(batch_size)}
+        hash_to_idx, num_constraints, scores, scores_hash, trackers = init_global_tracker(batch_size, constraints)
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
         # include the start symbols, which are implicit.
         predictions: List[torch.Tensor] = []
@@ -189,26 +195,27 @@ class ConstrainedBeamSearch:
 
         predictions_idx_to_hash = {}
         iter_items = list(hash_to_idx.items())
-        for bid, row in iter_items:
-            batch = row
-            beam = start_class_log_probabilities[row]
-            bin_size = math.floor(self.beam_size / num_constraints[batch]) or 1
-            # (1) The best k tokens across all rows of scores
+        for bid, batch in iter_items:
+            beam = start_class_log_probabilities[batch]
+            bin_size = math.floor(self.beam_size / num_constraints[hash(tuple(trackers[bid].keys()))]) or 1
+            # (1) The best k tokens for a single batch
             topk_log_prob, topk_index = beam.topk(self.beam_size)
 
             # (2) Unmet constraint
-            select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long)
+            select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]],
+                                        dtype=torch.long, device=start_class_log_probabilities.device)
             select_index = torch.cat([select_index, topk_index.squeeze()]).unique()
+            topk_index = topk_index.tolist()
             # (3) Expand and update trackers
             new_tracker_candidates = {}
             new_tracker_scores = {}
-            for i, idx in enumerate(select_index):
-                hash_to_idx[hash((bid, idx.item()))] = idx.item()
-                new_tracker_candidates[hash((bid, idx.item()))] = copy.deepcopy(trackers[bid])
-                if idx.item() in trackers[bid]:
-                    new_tracker_candidates[hash((bid, idx.item()))][idx.item()] = True
-                    new_tracker_scores[hash((bid, idx.item()))] = \
-                        count_score(new_tracker_candidates[hash((bid, idx.item()))], scores[batch])
+            for i, idx in enumerate(select_index.tolist()):
+                hash_to_idx[hash((bid, idx))] = idx
+                new_tracker_candidates[hash((bid, idx))] = copy.deepcopy(trackers[bid])
+                if idx in trackers[bid]:
+                    new_tracker_candidates[hash((bid, idx))][idx] = True
+                    new_tracker_scores[hash((bid, idx))] = \
+                        count_score(new_tracker_candidates[hash((bid, idx))], scores[batch])
             new_tracker_scores = sorted(new_tracker_scores.items(), key=lambda item: item[1])
 
             # (4) Obtain selected hash index
@@ -219,10 +226,10 @@ class ConstrainedBeamSearch:
                 {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
             start_predicted_class = torch.tensor(
                 [hash_to_idx[a_hash] for a_hash in start_hash_index],
-                dtype=torch.long)
+                dtype=torch.long, device=start_class_log_probabilities.device)
             start_predicted_hash = torch.tensor(
                 [a_hash for a_hash in start_hash_index],
-                dtype=torch.long)
+                dtype=torch.long, device=start_class_log_probabilities.device)
             start_top_log_probability = beam.gather(0, start_predicted_class)
             start_predicted_classes.append(start_predicted_class)
             start_predicted_hashes.append(start_predicted_hash)
@@ -264,7 +271,7 @@ class ConstrainedBeamSearch:
         for timestep in range(self.max_steps - 1):
             # shape: (batch_size * beam_size,)
             last_predictions = predictions[-1].reshape(batch_size * self.beam_size)
-            last_hashes = hashes[-1].reshape(batch_size*self.beam_size)
+            last_hashes = hashes[-1].reshape(batch_size * self.beam_size)
             # If every predicted token from the last step is `self._end_index`,
             # then we can stop early.
             if (last_predictions == self._end_index).all():
@@ -304,30 +311,33 @@ class ConstrainedBeamSearch:
                     predicted_classes.split(1, 0)
             ):
                 bid = bid.item()
-                select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long)
+                bin_size = math.floor(self.beam_size / num_constraints[hash(tuple(trackers[bid].keys()))]) or 1
+                select_index = torch.tensor([c for c in trackers[bid].keys() if not trackers[bid][c]], dtype=torch.long,
+                                            device=start_class_log_probabilities.device)
                 select_index = torch.cat([select_index, predicted_class.squeeze()]).unique()
                 new_tracker_candidates = {}
                 new_tracker_scores = {}
-                for i, idx in enumerate(select_index):
-                    hash_to_idx[hash((bid, idx.item()))] = idx.item()
-                    new_tracker_candidates[hash((bid, idx.item()))] = copy.deepcopy(trackers[bid])
-                    if idx.item() in trackers[bid]:
-                        new_tracker_candidates[hash((bid, idx.item()))][idx.item()] = True
-                        new_tracker_scores[hash((bid, idx.item()))] = \
-                            count_score(new_tracker_candidates[hash((bid, idx.item()))],
+                for i, idx in enumerate(select_index.tolist()):
+                    hash_to_idx[hash((bid, idx))] = idx
+                    new_tracker_candidates[hash((bid, idx))] = copy.deepcopy(trackers[bid])
+                    if idx in trackers[bid]:
+                        new_tracker_candidates[hash((bid, idx))][idx] = True
+                        new_tracker_scores[hash((bid, idx))] = \
+                            count_score(new_tracker_candidates[hash((bid, idx))],
                                         scores_hash[
-                                            hash(tuple(new_tracker_candidates[hash((bid, idx.item()))].keys()))])
+                                            hash(tuple(new_tracker_candidates[hash((bid, idx))].keys()))])
                 new_tracker_scores = sorted(new_tracker_scores.items(), key=lambda item: item[1])
-                start_hash_index = allocate_beam(new_tracker_scores, predicted_class.squeeze(), bin_size, self.beam_size, bid)
+                start_hash_index = allocate_beam(new_tracker_scores, predicted_class.squeeze().tolist(), bin_size,
+                                                 self.beam_size, bid)
                 candidates.update({a_hash: new_tracker_candidates[a_hash] for a_hash in start_hash_index})
                 predictions_idx_to_hash.update(
                     {idx: hash for hash, idx in hash_to_idx.items() if hash in start_hash_index})
                 next_predicted_class = torch.tensor(
                     [hash_to_idx[a_hash] for a_hash in start_hash_index],
-                    dtype=torch.long)
+                    dtype=torch.long, device=start_class_log_probabilities.device)
                 next_predicted_hash = torch.tensor(
                     [a_hash for a_hash in start_hash_index],
-                    dtype=torch.long)
+                    dtype=torch.long, device=start_class_log_probabilities.device)
                 next_top_log_probability = beam.squeeze().gather(0, next_predicted_class)
                 next_predicted_classes.append(next_predicted_class)
                 next_predicted_hashes.append(next_predicted_hash)
