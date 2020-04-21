@@ -371,7 +371,7 @@ class ConstrainedBeamSearch:
         batch_size = best_hyp_indices.shape[0] // self.beam_size
 
         nbest_translations = []  # type: List[List[Translation]]
-        for n in range(0, self.beam_size):
+        for n in range(0, 1):
 
             # Initialize the best_ids to the first item in each batch, plus current nbest index
             best_ids = np.arange(n, batch_size * self.beam_size, self.beam_size, dtype='int32')
