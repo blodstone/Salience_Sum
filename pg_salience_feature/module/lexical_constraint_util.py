@@ -11,11 +11,7 @@ class UpdateScores(Module):
 
     def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist):
         scores = target_dists + scores_accumulated
-        import pdb;pdb.set_trace()
-        scores = torch.where(
-            (finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.ByteTensor),
-            torch.cat((scores_accumulated, pad_dist), dim=1),
-            scores)
+        scores = torch.where((finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.bool), torch.cat((scores_accumulated, pad_dist), dim=1), scores)
         return scores
 
 
@@ -96,7 +92,7 @@ class NormalizeAndUpdateFinished(Module):
                        finished, scores_accumulated, lengths):
         all_finished = ((best_word_indices == self.pad_id) | (best_word_indices == self.eos_id))
         newly_finished = all_finished.type(torch.int32) ^ finished.type(torch.int32)
-        scores_accumulated = torch.where(newly_finished.unsqueeze(1).type(torch.ByteTensor), scores_accumulated / self.length_penalty(lengths), scores_accumulated)
+        scores_accumulated = torch.where(newly_finished.unsqueeze(1).type(torch.bool), scores_accumulated / self.length_penalty(lengths), scores_accumulated)
 
         # Update lengths of all items, except those that were already finished. This updates
         # the lengths for inactive items, too, but that doesn't matter since they are ignored anyway.
