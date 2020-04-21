@@ -133,14 +133,14 @@ class ConstrainedHypothesis:
         # Add extensions of a started-but-incomplete sequential constraint
         if self.last_met != -1 and self.is_sequence[self.last_met] == 1:
             word_id = self.constraints[self.last_met + 1]
-            if self.num_needed() == 1:
+            if word_id != self.eos_id or self.num_needed() == 1:
                 items.add(word_id)
 
         # Add all constraints that aren't non-initial sequences
         else:
             for i, word_id in enumerate(self.constraints):
                 if not self.met[i] and (i == 0 or not self.is_sequence[i - 1]):
-                    if self.num_needed() == 1:
+                    if word_id != self.eos_id or self.num_needed() == 1:
                         items.add(word_id)
 
         return items
