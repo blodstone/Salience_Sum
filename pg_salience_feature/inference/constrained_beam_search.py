@@ -320,8 +320,8 @@ class ConstrainedBeamSearch:
         lengths = torch.zeros((batch_size*self.beam_size, 1), device=device)
         finished = torch.zeros((batch_size*self.beam_size, ), device=device)
         is_pad_dist_set = False
-        scores_accumulated = torch.zeros((batch_size * self.beam_size, 1), device=device)
-        inactive = torch.zeros((batch_size * self.beam_size), device=device)
+        scores_accumulated = torch.zeros((batch_size * self.beam_size, 1), dtype=torch.int32,device=device)
+        inactive = torch.zeros((batch_size * self.beam_size), dtype=torch.int32, device=device)
         for t in range(1, self.max_steps):
             # shape: (batch_size, num_classes)
             target_dists, state = step(best_word_indices.type(torch.long), state, True)
