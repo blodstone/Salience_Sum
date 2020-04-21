@@ -41,7 +41,7 @@ def summarize(input, vocab_path, model, model_config, output_path, batch_size, c
         if (output_file.parent / 'constraint.txt').exists():
             os.remove(str((output_file.parent / 'constraint.txt')))
         for constraint in constraints:
-            write_constraints.append(constraint)
+            write_constraints.append(str(constraint))
         for i, sent_idx in enumerate(range(len(results['predictions']))):
             out = ' '.join(
                  [token for token in results['predictions'][sent_idx] if token != END_SYMBOL and token != START_SYMBOL and token != '@@PADDING@@'])
