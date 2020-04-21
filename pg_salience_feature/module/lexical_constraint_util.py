@@ -12,8 +12,8 @@ class UpdateScores(Module):
     def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist):
         scores = target_dists + scores_accumulated
         scores = torch.where(
-            (finished.unsqueeze(1) | inactive.unsqueeze(1)).type(torch.ByteTensor),
-            torch.cat((scores_accumulated, pad_dist), dim=1),
+            (finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.ByteTensor),
+            torch.cat((scores_accumulated.type(torch.float32), pad_dist), dim=1),
             scores)
         return scores
 
@@ -94,7 +94,7 @@ class NormalizeAndUpdateFinished(Module):
     def forward(self, best_word_indices, max_output_lengths,
                        finished, scores_accumulated, lengths):
         all_finished = ((best_word_indices == self.pad_id) | (best_word_indices == self.eos_id))
-        newly_finished = all_finished.type(torch.int32) ^ finished
+        newly_finished = all_finished.type(torch.int32) ^ finished.type(torch.int32)
         scores_accumulated = torch.where(newly_finished.unsqueeze(1).type(torch.ByteTensor), scores_accumulated / self.length_penalty(lengths), scores_accumulated)
 
         # Update lengths of all items, except those that were already finished. This updates
