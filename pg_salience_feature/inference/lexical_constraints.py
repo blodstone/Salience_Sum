@@ -160,7 +160,7 @@ class ConstrainedHypothesis:
         :param wordid: The wordid to validate.
         :return: True if all constraints are already met or the word ID is not the EOS id.
         """
-        return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
+        return self.finished() or (self.num_needed() == 1 and self.eos_id in self.allowed())
 
     def advance(self, word_id: int) -> 'ConstrainedHypothesis':
         """
