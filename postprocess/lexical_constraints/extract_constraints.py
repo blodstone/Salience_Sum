@@ -117,23 +117,29 @@ def main():
             # also remove stop words from noun chunks
             result = []
             used_idx = []
+            added_words = []
             doc = nlp(" ".join(src_seq))
             chunks = doc.noun_chunks
             for chunk in chunks:
-                phrase = []
+                phrase_idxs = []
                 score = 0
+                phrase_words = []
                 for token in chunk:
                     if not token.is_stop:
-                        phrase.append(token.i)
+                        phrase_words.append(token.text)
+                        phrase_idxs.append(token.i)
                         used_idx.append(token.i)
                         score += salience_seqs[token.i]
-                if len(phrase) != 0:
-                    score /= len(phrase)
-                    result.append((phrase, score))
+                if len(phrase_idxs) != 0 and phrase_words not in added_words:
+                    score /= len(phrase_idxs)
+                    result.append((phrase_idxs, score))
+                    added_words.append(phrase_words)
             # (2) Extract single word with stop words and noun chunks removed from text
             for token in doc:
                 if not token.is_stop and not token.i in used_idx:
-                    result.append(([token.i], salience_seqs[token.i]))
+                    if [token.text] not in added_words:
+                        result.append(([token.i], salience_seqs[token.i]))
+                        added_words.append([token.text])
             # (3) Sort and extract top k
             result.sort(key=lambda x: x[1], reverse=True)
             final_set = result[:k]

@@ -10,13 +10,16 @@ from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from pg_salience_feature import SummDataReader, Seq2SeqPredictor
 
 
-def summarize(input, vocab_path, model, model_config, output_path, batch_size, cuda, use_salience=True):
+def summarize(input, vocab_path, model, model_config, output_path, batch_size, cuda, use_salience=True, use_constraint=False):
     input_file = Path(input)
     output_file = Path(output_path)
     if output_file.exists():
         print('Output file already exists. Deleting it.')
         os.remove(str(output_file))
-    reader = SummDataReader(predict=True, source_max_tokens=400, use_salience=use_salience)
+    reader = SummDataReader(predict=True,
+                            source_max_tokens=400,
+                            use_salience=use_salience,
+                            use_constraint=use_constraint)
     config = Params.from_file(model_config)
     model_state = torch.load(model, map_location=torch.device(cuda))
     vocab = Vocabulary.from_files(vocab_path)
@@ -37,10 +40,10 @@ def summarize(input, vocab_path, model, model_config, output_path, batch_size, c
         if (output_file.parent / 'constraint.txt').exists():
             os.remove(str((output_file.parent / 'constraint.txt')))
         for constraint in constraints:
-            (output_file.parent / 'constraint.txt').open('a').write(' '.join(constraint)+'\n')
+            (output_file.parent / 'constraint.txt').open('a').write(str(constraint) + '\n')
         for i, sent_idx in enumerate(range(len(results['predictions']))):
             out = ' '.join(
-                [token for token in results['predictions'][sent_idx] if token != END_SYMBOL and token != START_SYMBOL])
+                 [token for token in results['predictions'][sent_idx] if token != END_SYMBOL and token != START_SYMBOL and token != '@@PADDING@@'])
             if i < len(results['predictions']):
                 out = f'{out}\n'
             output_file.open('a').write(out)
