@@ -80,7 +80,8 @@ class EncoderDecoder(Model):
                              state: Dict[str, torch.Tensor],
                              source_ids: Dict[str, torch.Tensor],
                              source_text: List[List[str]],
-                             constraints: List) -> Dict[str, List]:
+                             constraints: List,
+                             word_constraints: List) -> Dict[str, List]:
         """Make forward pass during prediction using a beam search."""
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
@@ -92,20 +93,32 @@ class EncoderDecoder(Model):
         # shape (log_probabilities): (batch_size, beam_size)
         all_top_k_predictions, log_probabilities = self.beam.search(
             start_predictions, state, self.take_step, constraints)
+        all = []
+        for i in range(all_top_k_predictions.shape[1]):
+            system_summaries = []
+            for batch_prediction in all_top_k_predictions[:, i, :].split(1, dim=1):
+                predict_tokens = []
+                for batch_idx, idx in enumerate(batch_prediction):
+                    idx = idx.item()
+                    if idx < self.vocab.get_vocab_size():
+                        token = self.vocab.get_token_from_index(idx)
+                    else:
+                        token = source_text[batch_idx][
+                            (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
+                    predict_tokens.append(token)
+                # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
+                system_summaries.append(predict_tokens)
+                # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
+                all.append(system_summaries)
         system_summaries = []
-        for batch_prediction in all_top_k_predictions[:, 0, :].split(1, dim=1):
-            predict_tokens = []
-            for batch_idx, idx in enumerate(batch_prediction):
-                idx = idx.item()
-                if idx < self.vocab.get_vocab_size():
-                    token = self.vocab.get_token_from_index(idx)
-                else:
-                    token = source_text[batch_idx][
-                        (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
-                predict_tokens.append(token)
-            # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
-            system_summaries.append(predict_tokens)
-            # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
+        for i, b in enumerate(zip(*all)):
+            max = 0
+            final = ''
+            for s in b:
+                n = len(set(s).intersection(set(word_constraints[i])))
+                if n >= max:
+                    final = s
+                system_summaries.append(final)
         output_dict = {
             "predictions": list(zip(*system_summaries))
         }
@@ -167,7 +180,7 @@ class EncoderDecoder(Model):
         last_predictions : ``torch.Tensor``
             A tensor of shape ``(group_size,)``, which gives the indices of the predictions
             during the last time step.
-        state : ``Dict[str, torch.Tensor]``
+        state : ``Dict[str, torch.Tensor]``community intelligence is needed to tackle the migrant boat threat along the south coast , a national crime agency -lrb- nca -rrb- chief has said .
             A dictionary of tensors that contain the current state information
             needed to predict the next step, which includes the encoder outputs,
             the source mask, and the decoder hidden state and context. Each of these
@@ -231,7 +244,7 @@ class EncoderDecoder(Model):
         if not self.training and not target_tokens:
             constraints, word_constraints = self.build_constraints(salience_values, source_text)
             output_dict['word_constraints'] = word_constraints
-            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text, constraints)
+            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text, constraints, word_constraints)
         return output_dict
 
     def _encode(self, source_tokens: Dict[str, torch.Tensor], salience_values: torch.Tensor) \
