@@ -383,8 +383,10 @@ def _sequential_topk(timestep: int,
     # Pad the beam so array assignment still works
     if num_pruned_candidates < beam_size:
         inactive[num_pruned_candidates:] = 1
-        pruned_candidates += [pruned_candidates[num_pruned_candidates - 1]] * (beam_size - num_pruned_candidates)
-
+        try:
+            pruned_candidates += [pruned_candidates[num_pruned_candidates - 1]] * (beam_size - num_pruned_candidates)
+        except IndexError:
+            print((num_pruned_candidates, len(pruned_candidates)))
     return (torch.tensor([x.row for x in pruned_candidates]),
             torch.tensor([x.col for x in pruned_candidates]),
             torch.tensor([[x.score] for x in pruned_candidates]),

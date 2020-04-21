@@ -1,4 +1,4 @@
-local HIDDEN=512;
+local HIDDEN=512;seq2seq_emb_mlp_16
 local EMBEDDING=128;
 local FEATURE=6;
 local CUDA=0;
