@@ -350,9 +350,6 @@ def _sequential_topk(timestep: int,
 
         # Now, create new candidates for each of these items
         for col in nextones:
-            # Hack.. need to check later
-            if col >= scores.shape[1]:
-                continue
             new_item = hyp.advance(col)
             score = scores[row, col].item()
             cand = ConstrainedCandidate(row, col, score, new_item)
