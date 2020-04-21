@@ -351,7 +351,6 @@ def _sequential_topk(timestep: int,
         # Now, create new candidates for each of these items
         for col in nextones:
             new_item = hyp.advance(col)
-            import pdb; pdb.set_trace()
             score = scores[row, col].item()
             cand = ConstrainedCandidate(row, col, score, new_item)
             candidates.add(cand)
