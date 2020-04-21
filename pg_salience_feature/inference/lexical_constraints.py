@@ -133,7 +133,7 @@ class ConstrainedHypothesis:
         # Add extensions of a started-but-incomplete sequential constraint
         if self.last_met != -1 and self.is_sequence[self.last_met] == 1:
             word_id = self.constraints[self.last_met + 1]
-            if word_id != self.eos_id or self.num_needed() == 1:
+            if self.num_needed() == 1:
                 items.add(word_id)
 
         # Add all constraints that aren't non-initial sequences
@@ -160,7 +160,7 @@ class ConstrainedHypothesis:
         :param wordid: The wordid to validate.
         :return: True if all constraints are already met or the word ID is not the EOS id.
         """
-        return self.finished() or (self.num_needed() == 1 and self.eos_id in self.allowed())
+        return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
 
     def advance(self, word_id: int) -> 'ConstrainedHypothesis':
         """
