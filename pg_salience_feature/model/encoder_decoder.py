@@ -1,8 +1,9 @@
 import math
-from typing import Dict, Tuple, Any, List
+from collections import Counter
+from typing import Dict, Tuple, List
 
 import torch
-import nltk
+from nltk.util import ngrams
 from nltk.corpus import stopwords
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data import Vocabulary
@@ -11,117 +12,20 @@ from allennlp.models import Model
 from allennlp.modules import TextFieldEmbedder
 from allennlp.nn import RegularizerApplicator, util
 from allennlp.nn.util import get_lengths_from_binary_sequence_mask
-from torch.distributions import Categorical, Gumbel
-from torch.nn import CrossEntropyLoss, Softmax, MSELoss, NLLLoss
+from torch.distributions import Categorical
+from torch.nn import NLLLoss
 
-from pg_salience_feature.module.beam_search import BeamSearch
-from pg_salience_feature.module.constrained_beam_search import ConstrainedBeamSearch
+from pg_salience_feature.inference.constrained_beam_search import ConstrainedBeamSearch
 from pg_salience_feature.module.decoder import Decoder
 from pg_salience_feature.module.encoder import Encoder
 
 
 # noinspection DuplicatedCode
-from pg_salience_feature.module.salience_embedder import SalienceEmbedder
 from pg_salience_feature.module.salience_src_mixer import SalienceSourceMixer
 
 
 @Model.register("enc_dec_salience_feature")
 class EncoderDecoder(Model):
-
-    def build_constraints(self, salience_values, source_text):
-        vocab_to_idx = self.vocab.get_token_to_index_vocabulary()
-        num_of_tokens = math.floor(0.8 * self.beam_size)
-        salience_values_sum = salience_values.sum(dim=2)
-        stopword_set = set(stopwords.words('english'))
-        constraints = []
-        word_constraints = []
-        for salience, doc in zip(salience_values_sum.split(1, 0), source_text):
-            salience = salience.squeeze()
-            word_salience = sorted([(salience[i], word) for i, word in enumerate(doc)],
-                                   key=lambda item: item[0], reverse=True)
-            constraint = []
-            word_constraint = []
-            for _, word in word_salience:
-                word = word.text.lower()
-                if word in stopword_set or word in word_constraint or word not in vocab_to_idx:
-                    continue
-                else:
-                    constraint.append(vocab_to_idx[word])
-                    word_constraint.append(word)
-                if len(constraint) == num_of_tokens:
-                    break
-            word_constraints.append(word_constraint)
-            constraints.append(constraint)
-        return constraints, word_constraints
-
-    def init_enc_state(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        source_mask = util.get_text_field_mask(source_tokens)
-        source_lengths = get_lengths_from_binary_sequence_mask(source_mask)
-        state = {
-            'source_mask': source_mask,  # (B, L)
-            'source_lengths': source_lengths,  # (L)
-            'source_tokens': source_tokens['tokens'],
-        }
-        return state
-
-    # noinspection PyMethodMayBeStatic
-    @staticmethod
-    def init_dec_state(state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        states = state['encoder_states']
-        batch_size = states.size(0)
-        length = states.size(1)
-        state['input_feed'] = states.new_zeros((batch_size, 1, states.size(2)))
-        state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
-        state['hidden_context'] = state['input_feed'].new_zeros(state['input_feed'].size())
-        return state
-
-    def _forward_beam_search(self,
-                             state: Dict[str, torch.Tensor],
-                             source_ids: Dict[str, torch.Tensor],
-                             source_text: List[List[str]],
-                             constraints: List,
-                             word_constraints: List) -> Dict[str, List]:
-        """Make forward pass during prediction using a beam search."""
-        state = self.init_dec_state(state)
-        state['source_ids'] = source_ids['ids']
-        state['max_oov'] = source_ids['max_oov']
-        batch_size = state["source_mask"].size()[0]
-        start_predictions = state["source_mask"].new_full((batch_size,), fill_value=self.start_idx)
-
-        # shape (all_top_k_predictions): (batch_size, beam_size, num_decoding_steps)
-        # shape (log_probabilities): (batch_size, beam_size)
-        all_top_k_predictions, log_probabilities = self.beam.search(
-            start_predictions, state, self.take_step, constraints)
-        all = []
-        for i in range(all_top_k_predictions.shape[1]):
-            system_summaries = []
-            for batch_prediction in all_top_k_predictions[:, i, :].split(1, dim=1):
-                predict_tokens = []
-                for batch_idx, idx in enumerate(batch_prediction):
-                    idx = idx.item()
-                    if idx < self.vocab.get_vocab_size():
-                        token = self.vocab.get_token_from_index(idx)
-                    else:
-                        token = source_text[batch_idx][
-                            (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
-                    predict_tokens.append(token)
-                # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
-                system_summaries.append(predict_tokens)
-                # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
-                all.append(system_summaries)
-        system_summaries = []
-        for i, b in enumerate(zip(*all)):
-            max = 0
-            final = ''
-            for s in b:
-                n = len(set(s).intersection(set(word_constraints[i])))
-                if n >= max:
-                    final = s
-                system_summaries.append(final)
-        output_dict = {
-            "predictions": list(zip(*system_summaries))
-        }
-        return output_dict
 
     def __init__(self,
                  source_embedder: TextFieldEmbedder,
@@ -160,10 +64,120 @@ class EncoderDecoder(Model):
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
         self.beam_size = 10
-        self.beam = ConstrainedBeamSearch(self.end_idx, max_steps=self.max_steps, beam_size=self.beam_size)
+        self.beam = ConstrainedBeamSearch(self.end_idx, self.start_idx, self.vocab.get_vocab_size(),
+                                          max_steps=self.max_steps, beam_size=self.beam_size)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
+
+    def update_constraint_idx(self, raw_constraints, source_text, source_ids):
+        new_raw_constraint = []
+        word_constraint = []
+        token_to_index = self.vocab.get_token_to_index_vocabulary()
+        for batch_idx, constraint in enumerate(raw_constraints):
+            new_phrase_idx = []
+            new_phrase_words = []
+            for phrase in constraint:
+                vocab_indexes = []
+                for word_idx in phrase:
+                    text = source_text[batch_idx][int(word_idx)].text
+                    if text in token_to_index:
+                        vocab_indexes.append(token_to_index[text])
+                    else:
+                        vocab_indexes.append(
+                            source_ids['ids'][batch_idx][int(word_idx)].item())
+                vocab_words = [source_text[batch_idx][int(word_idx)].text for word_idx in phrase]
+                if self.unk_idx not in vocab_indexes:
+                    new_phrase_idx.append(vocab_indexes)
+                    new_phrase_words.append(vocab_words)
+            if len(new_phrase_idx) != 0:
+                new_raw_constraint.append(new_phrase_idx)
+                word_constraint.append(new_phrase_words)
+        return new_raw_constraint, word_constraint
+
+    def init_enc_state(self, source_tokens: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        source_mask = util.get_text_field_mask(source_tokens)
+        source_lengths = get_lengths_from_binary_sequence_mask(source_mask)
+        state = {
+            'source_mask': source_mask,  # (B, L)
+            'source_lengths': source_lengths,  # (L)
+            'source_tokens': source_tokens['tokens'],
+        }
+        return state
+
+    def init_dec_state(self, state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        states = state['encoder_states']
+        batch_size = states.size(0)
+        length = states.size(1)
+        state['input_feed'] = states.new_zeros((batch_size, 1, states.size(2)))
+        state['coverage'] = states.new_zeros((batch_size, length, 1))  # (B, L, 1)
+        state['hidden_context'] = state['input_feed'].new_zeros(state['input_feed'].size())
+        return state
+
+    def _forward_beam_search(self,
+                             state: Dict[str, torch.Tensor],
+                             salience_values: torch.Tensor,
+                             source_ids: Dict[str, torch.Tensor],
+                             source_text: List[List[str]],
+                             raw_constraints: List) -> Dict[str, List]:
+        """Make forward pass during prediction using a beam search."""
+        state = self.init_dec_state(state)
+        state['source_ids'] = source_ids['ids']
+        state['max_oov'] = source_ids['max_oov']
+        batch_size = state["source_mask"].size()[0]
+        start_predictions = state["source_mask"].new_full((batch_size,), fill_value=self.start_idx)
+
+        # shape (all_top_k_predictions): (batch_size, beam_size, num_decoding_steps)
+        # shape (log_probabilities): (batch_size, beam_size)
+        n_best_translations = self.beam.search(
+            start_predictions, state, self.take_step, raw_constraints)
+        n_system_summaries = []
+        for best_translations in n_best_translations:
+            system_summaries = []
+            for batch_idx, translation in enumerate(best_translations):
+                predict_tokens = []
+                for idx in translation.target_ids:
+                    if idx < self.vocab.get_vocab_size():
+                        token = self.vocab.get_token_from_index(idx)
+                    else:
+                        token = source_text[batch_idx][
+                            (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
+                    if type(token) != str:
+                        token = token.text
+                    predict_tokens.append(token)
+                system_summaries.append(predict_tokens)
+            n_system_summaries.append(system_summaries)
+        # all = []
+        # for i in range(all_top_k_predictions.shape[1]):
+        #     system_summaries = []
+        #     for batch_prediction in all_top_k_predictions[:, i, :].split(1, dim=1):
+        #         predict_tokens = []
+        #         for batch_idx, idx in enumerate(batch_prediction):
+        #             idx = idx.item()
+        #             if idx < self.vocab.get_vocab_size():
+        #                 token = self.vocab.get_token_from_index(idx)
+        #             else:
+        #                 token = source_text[batch_idx][
+        #                     (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
+        #             predict_tokens.append(token)
+        #         # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
+        #         system_summaries.append(predict_tokens)
+        #         # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
+        #         all.append(system_summaries)
+        max_score = {batch: -1 for batch in range(len(n_system_summaries[0]))}
+        best_summary = {batch: '' for batch in range(len(n_system_summaries[0]))}
+        for system_summaries in n_system_summaries:
+            for batch, summary in enumerate(system_summaries):
+                score = len(set(source_text[batch]).intersection(set(summary)))
+                if score > max_score[batch]:
+                    max_score[batch] = score
+                    best_summary[batch] = summary
+        output_dict = {
+            "predictions": [summ for batch, summ in best_summary.items()]
+        }
+        return output_dict
+
+
 
     def take_step(self,
                   last_predictions: torch.Tensor,
@@ -208,12 +222,14 @@ class EncoderDecoder(Model):
             'tokens': tokens
         })
         state = self.decoder(emb, state, self.is_coverage, self.training, is_first_step)
-        return state['class_probs'].squeeze(1).log(), state
+        state['class_probs'] = state['class_probs'] + 1e-9
+        return -state['class_probs'].squeeze(1).log(), state
 
     def forward(self,
                 source_tokens: Dict[str, torch.Tensor],
                 source_text: List[List[str]],
                 source_ids: Dict[str, torch.Tensor],
+                raw_constraint: List[List[int]] = None,
                 target_text: List[List[str]] = None,
                 target_tokens: Dict[str, torch.Tensor] = None,
                 target_ids: torch.Tensor = None,
@@ -222,6 +238,7 @@ class EncoderDecoder(Model):
         """
         The forward function of the encoder and decoder model
 
+        :param raw_constraint: Lexical constraint
         :param target_text: The raw text of target sequence
         :param source_ids: The source ids that is unique to the document
         :param source_text: The raw text of source sequence
@@ -241,9 +258,12 @@ class EncoderDecoder(Model):
             output_dict['loss'] = self._compute_loss(target_tokens, target_ids, state)
 
         if not self.training and not target_tokens:
-            constraints, word_constraints = self.build_constraints(salience_values, source_text)
-            output_dict['word_constraints'] = word_constraints
-            output_dict['results'] = self._forward_beam_search(state, source_ids, source_text, constraints, word_constraints)
+            raw_constraints = None
+            if raw_constraint:
+                raw_constraints, word_constraints = \
+                    self.update_constraint_idx(raw_constraint, source_text, source_ids)
+                output_dict['word_constraints'] = word_constraints
+            output_dict['results'] = self._forward_beam_search(state, salience_values, source_ids, source_text, raw_constraints)
         return output_dict
 
     def _encode(self, source_tokens: Dict[str, torch.Tensor], salience_values: torch.Tensor) \

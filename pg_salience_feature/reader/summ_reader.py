@@ -21,15 +21,17 @@ class SummDataReader(DatasetReader):
                  interpolation: bool = False,
                  predict: bool = True,
                  use_salience: bool = False,
+                 use_constraint: bool = False,
                  lazy: bool = False) -> None:
         super().__init__(lazy)
         self._predict = predict
         self._source_max_tokens = source_max_tokens
         self._target_max_tokens = target_max_tokens
         self._interpolation = interpolation
+        self._use_constraint = use_constraint
         self._use_salience = use_salience
 
-    def process_line(self, src_seq, tgt_seq):
+    def process_line(self, src_seq, tgt_seq, const_seq):
         return_res = []
         collection_seq = list(zip(*[group.split(u'￨') for group in src_seq.split()]))
         src_seq = collection_seq[0]
@@ -43,6 +45,9 @@ class SummDataReader(DatasetReader):
             else:
                 return_res.append(None)
             return_res.append(salience_seqs)
+            if self._use_constraint:
+                const_seq = [constraint.split() for constraint in const_seq.split(u'￨')]
+                return_res.append(const_seq)
         else:
             if not self._predict:
                 return_res.append([Token(token) for token in tgt_seq.split()])
@@ -55,10 +60,14 @@ class SummDataReader(DatasetReader):
                 if line == '':
                     continue
                 try:
-                    src_seq, tgt_seq = line.split('\t')
+                    if self._use_constraint:
+                        src_seq, tgt_seq, const_seq = line.split('\t')
+                    else:
+                        src_seq, tgt_seq = line.split('\t')
+                        const_seq = None
                 except ValueError:
                     continue
-                yield self.text_to_instance(*self.process_line(src_seq, tgt_seq))
+                yield self.text_to_instance(*self.process_line(src_seq, tgt_seq, const_seq))
 
     def smooth_and_norm(self, value):
         value_dict = {i: x for i, x in enumerate(value) if x != 0}
@@ -77,8 +86,10 @@ class SummDataReader(DatasetReader):
             out.append(ids.setdefault(token.text.lower(), len(ids) + 1))
         return out
 
-    def text_to_instance(self, src_seq: List[Token], tgt_seq: List[Token] = None,
-                         salience_seq: Iterable[float] = None) -> Instance:
+    def text_to_instance(self, src_seq: List[Token],
+                         tgt_seq: List[Token] = None,
+                         salience_seq: Iterable[float] = None,
+                         constraint_seq: Iterable[List] = None) -> Instance:
         indexer = SingleIdTokenIndexer(lowercase_tokens=True)
 
         tokenized_src = src_seq[:self._source_max_tokens]
@@ -103,6 +114,7 @@ class SummDataReader(DatasetReader):
                                                tokenized_tgt,
                                                self._target_max_tokens)
             target_text_field = MetadataField(metadata=tokenized_tgt)
+
             output_field['target_tokens'] = target_field
             output_field['target_ids'] = target_ids_field
             output_field['target_text'] = target_text_field
@@ -117,4 +129,6 @@ class SummDataReader(DatasetReader):
                 salience_field = ArrayField(
                     np.array(salience_seq[:self._source_max_tokens]), padding_value=0, dtype=numpy.long)
             output_field['salience_values'] = salience_field
+        if constraint_seq:
+            output_field['raw_constraint'] = MetadataField(constraint_seq)
         return Instance(output_field)
