@@ -99,6 +99,7 @@ def main():
     nlp = spacy.load("en_core_web_sm")
     nlp.tokenizer = WhitespaceTokenizer(nlp.vocab)
     k = args.k
+    max_len = args.max_len
     tsv = Path(args.tsv)
     updated_lines = []
     i = 1
@@ -128,7 +129,7 @@ def main():
                 score = 0
                 phrase_words = []
                 for token in chunk:
-                    if not token.is_stop:
+                    if not token.is_stop and token.i < max_len:
                         phrase_words.append(token.text)
                         phrase_idxs.append(token.i)
                         used_idx.append(token.i)
@@ -139,7 +140,7 @@ def main():
                     added_words.append(phrase_words)
             # (2) Extract single word with stop words and noun chunks removed from text
             for token in doc:
-                if not token.is_stop and not token.i in used_idx:
+                if not token.is_stop and not token.i in used_idx and token.i < max_len:
                     if [token.text] not in added_words:
                         result.append(([token.i], salience_seqs[token.i]))
                         added_words.append([token.text])
@@ -163,5 +164,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-tsv', help='TSV file.')
     parser.add_argument('-k', help='Top phrases to use.', type=int)
+    parser.add_argument('-max_len', help='Maximum length of text to consider.', type=int)
     args = parser.parse_args()
     main()

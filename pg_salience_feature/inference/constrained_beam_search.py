@@ -317,8 +317,8 @@ class ConstrainedBeamSearch:
         best_hyp_indices_list = []
         best_word_indices_list = []
 
-        lengths = torch.zeros((batch_size*self.beam_size, 1))
-        finished = torch.zeros((batch_size*self.beam_size, ), dtype=torch.int32)
+        lengths = torch.zeros((batch_size*self.beam_size, 1), device=device)
+        finished = torch.zeros((batch_size*self.beam_size, ), device=device)
         is_pad_dist_set = False
         scores_accumulated = torch.zeros((batch_size * self.beam_size, 1), device=device)
         inactive = torch.zeros((batch_size * self.beam_size), dtype=torch.int32, device=device)
