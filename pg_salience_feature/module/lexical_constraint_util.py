@@ -11,9 +11,10 @@ class UpdateScores(Module):
 
     def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist):
         scores = target_dists + scores_accumulated
+        import pdb;pdb.set_trace()
         scores = torch.where(
             (finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.ByteTensor),
-            torch.cat((scores_accumulated.type(torch.float32), pad_dist), dim=1),
+            torch.cat((scores_accumulated, pad_dist), dim=1),
             scores)
         return scores
 
