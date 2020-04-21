@@ -34,16 +34,18 @@ def summarize(input, vocab_path, model, model_config, output_path, batch_size, c
 
     predictor = Seq2SeqPredictor(model=model, data_reader=reader, batch_size=batch_size, cuda_device=cuda)
     output = predictor.predict(file_path=str(input_file), vocab=vocab)
+    write_constraints = []
     for out in output:
         results = out['results']
         constraints = out['word_constraints']
         if (output_file.parent / 'constraint.txt').exists():
             os.remove(str((output_file.parent / 'constraint.txt')))
         for constraint in constraints:
-            (output_file.parent / 'constraint.txt').open('a').write(str(constraint) + '\n')
+            write_constraints.append(constraint)
         for i, sent_idx in enumerate(range(len(results['predictions']))):
             out = ' '.join(
                  [token for token in results['predictions'][sent_idx] if token != END_SYMBOL and token != START_SYMBOL and token != '@@PADDING@@'])
             if i < len(results['predictions']):
                 out = f'{out}\n'
             output_file.open('a').write(out)
+    (output_file.parent / 'constraint.txt').open('w').write('\n'.join(write_constraints))
