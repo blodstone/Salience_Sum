@@ -101,11 +101,14 @@ def main():
     k = args.k
     tsv = Path(args.tsv)
     updated_lines = []
+    i = 1
     for line in tsv.open('r'):
         line = line.strip()
         if line == '':
             continue
         try:
+            print(i)
+            i += 1
             orig_src_seq, tgt_seq = line.split('\t')
             collection_seq = list(zip(*[group.split(u'￨') for group in orig_src_seq.split()]))
             src_seq = collection_seq[0]
