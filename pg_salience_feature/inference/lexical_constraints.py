@@ -122,7 +122,7 @@ class ConstrainedHypothesis:
 
     def allowed(self) -> Set[int]:
         """
-        Returns the set of constrained words that could follow this one.
+        Returns the set/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/test.constraint.tsv of constrained words that could follow this one.
         For unfinished phrasal constraints, it is the next word in the phrase.
         In other cases, it is the list of all unmet constraints.
         If all constraints are met, an empty set is returned.

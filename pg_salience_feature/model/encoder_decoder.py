@@ -137,11 +137,17 @@ class EncoderDecoder(Model):
             for batch_idx, translation in enumerate(best_translations):
                 predict_tokens = []
                 for idx in translation.target_ids:
+                    if type(idx) != int:
+                        idx = idx.item()
                     if idx < self.vocab.get_vocab_size():
                         token = self.vocab.get_token_from_index(idx)
                     else:
-                        token = source_text[batch_idx][
-                            (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
+                        real_id = (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()
+                        if len(real_id.size()) != 0:
+                            real_id = real_id[0].item()
+                        else:
+                            real_id = real_id.item()
+                        token = source_text[batch_idx][real_id]
                     if type(token) != str:
                         token = token.text
                     predict_tokens.append(token)
