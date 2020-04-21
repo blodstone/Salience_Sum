@@ -5,5 +5,5 @@ DATA=$HOME/data/bbc
 source $HOME/venv/bin/activate
 
 MODEL=$HOME/model/bbc/emb_mlp_16
-python $HOME/summarize.py -input $DATA/ready/test.constraint.10.small.tsv -vocab_path $MODEL/vocabulary -model $MODEL/pick.th -model_config $MODEL/config.json -output_path $DATA/result_4/constraint_seq2seq_salience_emb_mlp_attn_300.out -batch_size 24 --cuda --use_salience --use_constraint
+python $HOME/summarize.py -input $DATA/ready/test.constraint.10.tsv -vocab_path $MODEL/vocabulary -model $MODEL/pick.th -model_config $MODEL/config.json -output_path $DATA/result_4/constraint_seq2seq_salience_emb_mlp_attn_300.out -batch_size 24 --cuda --use_salience --use_constraint
 
