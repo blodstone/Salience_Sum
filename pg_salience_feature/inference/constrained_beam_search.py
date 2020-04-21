@@ -364,10 +364,10 @@ class ConstrainedBeamSearch:
         best_hyp_indices_list.append(best_hyp_indices)
         lengths = lengths[best_hyp_indices.type(torch.long)]
         scores_accumulated = torch.take(scores_accumulated, best_hyp_indices.type(torch.long))
-        constraints = [constraints[x] for x in best_hyp_indices.numpy()]
+        constraints = [constraints[x] for x in best_hyp_indices.cpu().numpy()]
 
-        best_hyp_indices = torch.stack(best_hyp_indices_list, dim=1).numpy()
-        best_word_indices = torch.stack(best_word_indices_list, dim=1).numpy()
+        best_hyp_indices = torch.stack(best_hyp_indices_list, dim=1).cpu().numpy()
+        best_word_indices = torch.stack(best_word_indices_list, dim=1).cpu().numpy()
         batch_size = best_hyp_indices.shape[0] // self.beam_size
 
         nbest_translations = []  # type: List[List[Translation]]
@@ -380,7 +380,7 @@ class ConstrainedBeamSearch:
             if n == 0 and any(constraints):
                 # For constrained decoding, select from items that have met all constraints (might not be finished)
                 unmet = np.array([c.num_needed() if c is not None else 0 for c in constraints])
-                filtered = np.where(unmet == 0, scores_accumulated.numpy().flatten(), np.inf)
+                filtered = np.where(unmet == 0, scores_accumulated.cpu().numpy().flatten(), np.inf)
                 filtered = filtered.reshape((batch_size, self.beam_size))
                 best_ids += np.argmin(filtered, axis=1).astype('int32')
 
