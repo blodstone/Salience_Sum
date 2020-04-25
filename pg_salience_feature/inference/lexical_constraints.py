@@ -12,12 +12,12 @@ def get_bank_sizes(num_constraints: int,
                    beam_size: int,
                    candidate_counts: List[int]) -> List[int]:
     """
-    Evenly distributes the beam across the banks, where each bank is a portion of the beam devoted
+    Evenly distributes the beam_search across the banks, where each bank is a portion of the beam_search devoted
     to hypotheses having met the same number of constraints, 0..num_constraints.
     After the assignment, banks with more slots than candidates are adjusted.
 
     :param num_constraints: The number of constraints.
-    :param beam_size: The beam size.
+    :param beam_size: The beam_search size.
     :param candidate_counts: The empirical counts of number of candidates in each bank.
     :return: A distribution over banks.
     """
@@ -160,8 +160,8 @@ class ConstrainedHypothesis:
         :param wordid: The wordid to validate.
         :return: True if all constraints are already met or the word ID is not the EOS id.
         """
-        return True
-        # return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
+        # return True
+        return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
 
     def advance(self, word_id: int) -> 'ConstrainedHypothesis':
         """
@@ -212,7 +212,7 @@ class ConstrainedHypothesis:
 
 class ConstrainedCandidate:
     """
-    Object used to hold candidates for the beam in topk().
+    Object used to hold candidates for the beam_search in topk().
 
     :param row: The row in the scores matrix.
     :param col: The column (word ID) in the scores matrix.
@@ -253,13 +253,13 @@ def topk(timestep: int,
          seq_scores: torch.Tensor) -> Tuple[
     torch.Tensor, torch.Tensor, torch.Tensor, List[ConstrainedHypothesis], torch.Tensor]:
     """
-    Builds a new topk list such that the beam contains hypotheses having completed different numbers of constraints.
+    Builds a new topk list such that the beam_search contains hypotheses having completed different numbers of constraints.
     These items are built from three different types: (1) the best items across the whole
     scores matrix, (2) the set of words that must follow existing constraints, and (3) k-best items from each row.
 
     :param timestep: The current decoder timestep.
     :param batch_size: The number of segments in the batch.
-    :param beam_size: The length of the beam for each segment.
+    :param beam_size: The length of the beam_search for each segment.
     :param inactive: Array listing inactive rows (shape: (beam_size,)).
     :param scores: The scores array (shape: (batch_size if t==1 else beam_size, target_vocab_size)).
     :param hypotheses: The list of hypothesis objects.
@@ -303,12 +303,12 @@ def _sequential_topk(timestep: int,
                      sequence_scores: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor,
                                                              List[ConstrainedHypothesis], torch.Tensor]:
     """
-    Builds a new topk list such that the beam contains hypotheses having completed different numbers of constraints.
+    Builds a new topk list such that the beam_search contains hypotheses having completed different numbers of constraints.
     These items are built from three different types: (1) the best items across the whole
     scores matrix, (2) the set of words that must follow existing constraints, and (3) k-best items from each row.
 
     :param timestep: The current decoder timestep.
-    :param beam_size: The length of the beam for each segment.
+    :param beam_size: The length of the beam_search for each segment.
     :param inactive: Array listing inactive rows (shape: (beam_size,)).
     :param scores: The scores array (shape: (beam_size, target_vocab_size)).
     :param hypotheses: The list of hypothesis objects.
@@ -356,7 +356,7 @@ def _sequential_topk(timestep: int,
             cand = ConstrainedCandidate(row, col, score, new_item)
             candidates.add(cand)
 
-    # Sort the candidates. After allocating the beam across the banks, we will pick the top items
+    # Sort the candidates. After allocating the beam_search across the banks, we will pick the top items
     # for each bank from this list
     sorted_candidates = sorted(candidates, key=attrgetter('score'))
 
@@ -381,7 +381,7 @@ def _sequential_topk(timestep: int,
 
     inactive[:num_pruned_candidates] = 0
 
-    # Pad the beam so array assignment still works
+    # Pad the beam_search so array assignment still works
     if num_pruned_candidates < beam_size:
         inactive[num_pruned_candidates:] = 1
         pruned_candidates += [pruned_candidates[num_pruned_candidates - 1]] * (beam_size - num_pruned_candidates)

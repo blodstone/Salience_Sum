@@ -1,18 +1,62 @@
-from typing import List, Callable, Tuple, Dict
+from typing import List, Callable, Tuple, Dict, Optional
 import warnings
 
 import torch
+import numpy as np
+from torch.distributions import Categorical
 
+from allennlp.common import Registrable
 from allennlp.common.checks import ConfigurationError
-
+from pg_salience_feature.inference import lexical_constraints
+from pg_salience_feature.inference.lexical_constraints import ConstrainedHypothesis, RawConstraintList
+from pg_salience_feature.module.lexical_constraint_util import UpdateScores, SortByIndex, NormalizeAndUpdateFinished, \
+    SortStateByIndex
 
 StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType, bool], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
+TokenIds = List[int]
+BeamHistory = Dict[str, List]
 
 
-class BeamSearch:
+class NBestTranslations:
+    __slots__ = ('target_ids_list',
+                 'attention_matrices',
+                 'scores')
+
+    def __init__(self,
+                 target_ids_list: List[TokenIds],
+                 attention_matrices: List[np.ndarray],
+                 scores: List[float]) -> None:
+        self.target_ids_list = target_ids_list
+        self.attention_matrices = attention_matrices
+
+        self.scores = scores
+
+
+class Translation:
+    __slots__ = ('target_ids',
+                 'attention_matrix',
+                 'score',
+                 'beam_histories',
+                 'nbest_translations',
+                 'estimated_reference_length')
+
+    def __init__(self,
+                 target_ids: TokenIds,
+                 score: float,
+                 beam_histories: List[BeamHistory] = None,
+                 nbest_translations: NBestTranslations = None,
+                 estimated_reference_length: Optional[float] = None) -> None:
+        self.target_ids = target_ids
+        self.score = score
+        self.beam_histories = beam_histories if beam_histories is not None else []
+        self.nbest_translations = nbest_translations
+        self.estimated_reference_length = estimated_reference_length
+
+
+class BeamSearch(Registrable):
     """
-    Implements the beam search algorithm for decoding the most likely sequences.
+    Implements the beam_search search algorithm for decoding the most likely sequences.
 
     Parameters
     ----------
@@ -22,7 +66,7 @@ class BeamSearch:
         The maximum number of decoding steps to take, i.e. the maximum length
         of the predicted sequences.
     beam_size : ``int``, optional (default = 10)
-        The width of the beam used.
+        The width of the beam_search used.
     per_node_beam_size : ``int``, optional (default = beam_size)
         The maximum number of candidates to consider per node, at each step in the search.
         If not given, this just defaults to ``beam_size``. Setting this parameter
@@ -32,21 +76,177 @@ class BeamSearch:
     """
 
     def __init__(self,
-                 end_index: int,
-                 max_steps: int = 50,
                  beam_size: int = 10,
                  per_node_beam_size: int = None) -> None:
-        self._end_index = end_index
-        self.max_steps = max_steps
+        # Pre-initialized value, must call init_beam to set the value
+        self.end_index = 0
+        self.max_steps = 100
+        self.update_finished = None
+        self.is_beam_configured = False
+
         self.beam_size = beam_size
         self.per_node_beam_size = per_node_beam_size or beam_size
+        self.update_scores = UpdateScores()
+        self.sort_by_index = SortByIndex()
+        self.sort_state_by_index = SortStateByIndex()
+
+    def config_beam(self, end_index: int, max_steps: int):
+        self.end_index = end_index
+        self.max_steps = max_steps
+        self.update_finished = NormalizeAndUpdateFinished(0, self.end_index)
+        self.is_beam_configured = True
+
+    def unravel_index(self, index, shape):
+        out = []
+        for dim in reversed(shape):
+            out.append(index % dim)
+            index = index // dim
+        return tuple(reversed(out))
+
+    # def sample_topk(self, k, n, scores, target_dists, finished, best_hyp_indices):
+    #         """
+    #         Choose an extension of each hypothesis from its softmax distribution.
+    #
+    #         :param scores: Vocabulary scores for the next beam_search step. (batch_size * beam_size, target_vocabulary_size)
+    #         :param target_dists: The non-cumulative target distributions (ignored).
+    #         :param finished: The list of finished hypotheses.
+    #         :param best_hyp_indices: Best hypothesis indices constant.
+    #         :return: The row indices, column indices, and values of the sampled words.
+    #         """
+    #         # Map the negative logprobs to probabilities so as to have a distribution
+    #         target_dists = torch.exp(-target_dists)
+    #
+    #         # n == 0 means sample from the full vocabulary. Otherwise, we sample from the top n.
+    #         if n != 0:
+    #             # select the top n in each row, via a mask
+    #
+    #             _, indices = torch.topk(target_dists, dim=1, k=n, largest=True)
+    #             masked_items = torch.zeros(target_dists.shape, device=target_dists.device)
+    #             masked_items.scatter_(1, indices, 1)
+    #             # set unmasked items to 0
+    #             masked_items = torch.where(masked_items, target_dists, masked_items)
+    #             # renormalize
+    #             target_dists = masked_items / masked_items.sum(dim=1, keepdim=True)
+    #
+    #         # Sample from the target distributions over words, then get the corresponding values from the cumulative scores
+    #         prob_dist = Categorical(target_dists)
+    #         tokens = prob_dist.sample()
+    #         best_word_indices = F.random.multinomial(target_dists, get_prob=False)
+    #         # Zeroes for finished hypotheses.
+    #         best_word_indices = F.where(finished, F.zeros_like(best_word_indices), best_word_indices)
+    #         values = F.pick(scores, best_word_indices, axis=1, keepdims=True)
+    #
+    #         best_hyp_indices = F.slice_like(best_hyp_indices, best_word_indices, axes=(0,))
+    #
+    #         return best_hyp_indices, best_word_indices, values
+
+    def topk(self, scores: torch.Tensor,
+             offset: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Get the lowest k elements per sentence from a `scores` matrix.
+        At the first timestep, the shape of scores is (batch, target_vocabulary_size).
+        At subsequent steps, the shape is (batch * k, target_vocabulary_size).
+
+        :param scores: Vocabulary scores for the next beam_search step. (batch_size * beam_size, target_vocabulary_size)
+        :param offset: Array (shape: batch_size * k) containing offsets to add to the hypothesis indices in batch decoding.
+        :param k: The number of smallest scores to return.
+        :return: The row indices, column indices and values of the k smallest items in matrix.
+        """
+
+        # Compute the batch size from the offsets and k. We don't know the batch size because it is
+        # either 1 (at timestep 1) or k (at timesteps 2+).
+        # (batch_size, beam_size * target_vocab_size)
+        k = self.beam_size
+        batch_size = int(offset.shape[-1] / k)
+        folded_scores = scores.reshape((batch_size, -1))
+
+        # pylint: disable=unbalanced-tuple-unpacking
+        values, indices = torch.topk(folded_scores, dim=1, k=k, largest=False)
+        indices = indices.type(torch.int32).reshape((-1,))
+        best_hyp_indices, best_word_indices = self.unravel_index(indices, shape=(batch_size * k, scores.shape[-1]))
+
+        if batch_size > 1:
+            # Offsetting the indices to match the shape of the scores matrix
+            best_hyp_indices += offset
+
+        values = values.reshape((-1, 1))
+        return best_hyp_indices, best_word_indices, values
+
+    def init_batch(self,
+                   raw_constraints: List[Optional[RawConstraintList]],
+                   beam_size: int,
+                   start_id: int,
+                   eos_id: int) -> List[Optional[ConstrainedHypothesis]]:
+        """
+        :param raw_constraints: The list of raw constraints (list of list of IDs).
+        :param beam_size: The beam_search size.
+        :param start_id: The target-language vocabulary ID of the SOS symbol.
+        :param eos_id: The target-language vocabulary ID of the EOS symbol.
+        :return: A list of ConstrainedHypothesis objects (shape: (batch_size * beam_size,)).
+        """
+        constraints = [None] * (len(raw_constraints) * beam_size)  # type: List[Optional[ConstrainedHypothesis]]
+        if any(raw_constraints):
+            for i, raw_list in enumerate(raw_constraints):
+                num_constraints = sum([len(phrase) for phrase in raw_list]) if raw_list is not None else 0
+                if num_constraints > 0:
+                    hyp = ConstrainedHypothesis(raw_list, eos_id)
+                    idx = i * beam_size
+                    constraints[idx:idx + beam_size] = [hyp.advance(start_id) for x in range(beam_size)]
+
+        return constraints
+
+    def _assemble_translation(self, sequence: np.ndarray,
+                              length: np.ndarray,
+                              seq_score: np.ndarray) -> Translation:
+        """
+        Takes a set of data pertaining to a single translated item, performs slightly different
+        processing on each, and merges it into a Translation object.
+        :param sequence: Array of word ids. Shape: (batch_size, bucket_key).
+        :param length: The length of the translated segment.
+        :param attention_lists: Array of attentions over source words.
+                                Shape: (batch_size * self.beam_size, max_output_length, encoded_source_length).
+        :param seq_score: Array of length-normalized negative log-probs.
+        :param estimated_reference_length: Estimated reference length (if any).
+        :param beam_history: The optional beam_search histories for each sentence in the batch.
+        :return: A Translation object.
+        """
+        length = int(length)
+        sequence = sequence[:length].tolist()
+        score = float(seq_score)
+        return Translation(sequence, score,
+                           nbest_translations=None)
+
+    def get_best_word_indices_for_kth_hypotheses(self, ks: np.ndarray, all_hyp_indices: np.ndarray) -> np.ndarray:
+        """
+        Traverses the matrix of best hypotheses indices collected during beam_search search in reversed order by
+        using the kth hypotheses index as a backpointer.
+        Returns an array containing the indices into the best_word_indices collected during beam_search search to extract
+        the kth hypotheses.
+
+        :param ks: The kth-best hypotheses to extract. Supports multiple for batch_size > 1. Shape: (batch,).
+        :param all_hyp_indices: All best hypotheses indices list collected in beam_search search. Shape: (batch * beam_search, steps).
+        :return: Array of indices into the best_word_indices collected in beam_search search
+            that extract the kth-best hypothesis. Shape: (batch,).
+        """
+        batch_size = ks.shape[0]
+        num_steps = all_hyp_indices.shape[1]
+        result = np.zeros((batch_size, num_steps - 1), dtype=all_hyp_indices.dtype)
+        # first index into the history of the desired hypotheses.
+        pointer = all_hyp_indices[ks, -1]
+        # for each column/step follow the pointer, starting from the penultimate column/step
+        num_steps = all_hyp_indices.shape[1]
+        for step in range(num_steps - 2, -1, -1):
+            result[:, step] = pointer
+            pointer = all_hyp_indices[pointer, step]
+        return result
 
     def search(self,
                start_predictions: torch.Tensor,
-               start_state: StateType,
-               step: StepFunctionType) -> Tuple[torch.Tensor, torch.Tensor]:
+               state: StateType,
+               step: StepFunctionType,
+               raw_constraint_list) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Given a starting state and a step function, apply beam search to find the
+        Given a starting state and a step function, apply beam_search search to find the
         most likely target sequences.
 
         Notes
@@ -54,7 +254,7 @@ class BeamSearch:
         If your step function returns ``-inf`` for some log probabilities
         (like if you're using a masked log-softmax) then some of the "best"
         sequences returned may also have ``-inf`` log probability. Specifically
-        this happens when the beam size is smaller than the number of actions
+        this happens when the beam_search size is smaller than the number of actions
         with finite log probability (non-zero probability) returned by the step function.
         Therefore if you're using a mask you may want to check the results from ``search``
         and potentially discard sequences with non-finite log probability.
@@ -90,187 +290,119 @@ class BeamSearch:
             has shape ``(batch_size, beam_size, max_steps)`` and ``log_probabilities``
             has shape ``(batch_size, beam_size)``.
         """
-        batch_size = start_predictions.size()[0]
+        if not self.is_beam_configured:
+            raise ConfigurationError('Beam is not configured through init_beam yet.')
+        batch_size = start_predictions.shape[0]
+        start_index = start_predictions[0].item()
+        device = start_predictions.device
 
-        # List of (batch_size, beam_size) tensors. One for each time step. Does not
-        # include the start symbols, which are implicit.
-        predictions: List[torch.Tensor] = []
-
-        # List of (batch_size, beam_size) tensors. One for each time step. None for
-        # the first.  Stores the index n for the parent prediction, i.e.
-        # predictions[t-1][i][n], that it came from.
-        backpointers: List[torch.Tensor] = []
-
-        # Calculate the first timestep. This is done outside the main loop
-        # because we are going from a single decoder input (the output from the
-        # encoder) to the top `beam_size` decoder outputs. On the other hand,
-        # within the main loop we are going from the `beam_size` elements of the
-        # beam to `beam_size`^2 candidates from which we will select the top
-        # `beam_size` elements for the next iteration.
-        # shape: (batch_size, num_classes)
-        start_class_log_probabilities, state = step(start_predictions, start_state, True)
-
-        num_classes = start_class_log_probabilities.size()[1]
-
-        # Make sure `per_node_beam_size` is not larger than `num_classes`.
-        if self.per_node_beam_size > num_classes:
-            raise ConfigurationError(f"Target vocab size ({num_classes:d}) too small "
-                                     f"relative to per_node_beam_size ({self.per_node_beam_size:d}).\n"
-                                     f"Please decrease beam_size or per_node_beam_size.")
-
-        # shape: (batch_size, beam_size), (batch_size, beam_size)
-        start_top_log_probabilities, start_predicted_classes = \
-                start_class_log_probabilities.topk(self.beam_size)
-        if self.beam_size == 1 and (start_predicted_classes == self._end_index).all():
-            warnings.warn("Empty sequences predicted. You may want to increase the beam size or ensure "
-                          "your step function is working properly.",
-                          RuntimeWarning)
-            return start_predicted_classes.unsqueeze(-1), start_top_log_probabilities
-
-        # The log probabilities for the last time step.
-        # shape: (batch_size, beam_size)
-        last_log_probabilities = start_top_log_probabilities
-
-        # shape: [(batch_size, beam_size)]
-        predictions.append(start_predicted_classes)
-
-        # Log probability tensor that mandates that the end token is selected.
-        # shape: (batch_size * beam_size, num_classes)
-        log_probs_after_end = start_class_log_probabilities.new_full(
-                (batch_size * self.beam_size, num_classes),
-                float("-inf")
-        )
-        log_probs_after_end[:, self._end_index] = 0.
-
-        # Set the same state for each element in the beam.
+        # Expanding to (batch*beam_search) for all states
         for key, state_tensor in state.items():
             _, *last_dims = state_tensor.size()
             # shape: (batch_size * beam_size, *)
-            state[key] = state_tensor.\
-                    unsqueeze(1).\
-                    expand(batch_size, self.beam_size, *last_dims).\
-                    reshape(batch_size * self.beam_size, *last_dims)
+            state[key] = state_tensor. \
+                unsqueeze(1). \
+                expand(batch_size, self.beam_size, *last_dims). \
+                reshape(batch_size * self.beam_size, *last_dims)
 
-        for timestep in range(self.max_steps - 1):
-            # shape: (batch_size * beam_size,)
-            last_predictions = predictions[-1].reshape(batch_size * self.beam_size)
+        # (batch_size, ) the offset denoting starting batch index, repeated for batch
+        batch_indices = torch.arange(0, batch_size * self.beam_size, self.beam_size, dtype=torch.long, device=device)
+        # (batch_size*beam_size, )
+        best_word_indices = start_predictions.unsqueeze(1) \
+            .expand((batch_size, self.beam_size)).reshape((batch_size*self.beam_size,))
+        constraints = self.init_batch(raw_constraint_list, self.beam_size,
+                                      start_index, self.end_index)
 
-            # If every predicted token from the last step is `self._end_index`,
-            # then we can stop early.
-            if (last_predictions == self._end_index).all():
+        # (batch_size*beam_search, ) the offset denoting starting batch index, repeated for batch*beam_search
+        offset = torch.arange(0, batch_size*self.beam_size,
+                              self.beam_size, dtype=torch.int32, device=device) \
+            .repeat_interleave(self.beam_size)
+
+        # For forcing the first step to share the same ancestor
+        first_step_mask = torch.full((batch_size * self.beam_size, 1),
+                                     fill_value=float('Inf'), device=device)
+        first_step_mask[batch_indices] = 1.0
+
+        max_output_lengths = torch.full((batch_size * self.beam_size,),
+                                        fill_value=self.max_steps, device=device)
+        best_hyp_indices_list = []
+        best_word_indices_list = []
+
+        lengths = torch.zeros((batch_size*self.beam_size, 1), device=device)
+        finished = torch.zeros((batch_size*self.beam_size, ), device=device, dtype=torch.int32)
+
+        is_pad_dist_set = False
+        scores_accumulated = torch.zeros((batch_size * self.beam_size, 1), device=device)
+
+        inactive = torch.zeros((batch_size * self.beam_size), dtype=torch.int32, device=device)
+        for t in range(1, self.max_steps):
+            # shape: (batch_size, num_classes)
+            target_dists, state = step(best_word_indices.type(torch.long), state, True)
+            if not is_pad_dist_set:
+                pad_dist = torch.full((batch_size * self.beam_size, target_dists.shape[-1] - 1),
+                                      fill_value=float('Inf'), device=device)
+                is_pad_dist_set = True
+            scores = self.update_scores.forward(target_dists, finished,
+                                                inactive, scores_accumulated, pad_dist)
+            if t == 1:
+                scores *= first_step_mask
+            best_hyp_indices, best_word_indices, scores_accumulated = self.topk(scores, offset)
+            if any(raw_constraint_list):
+                best_hyp_indices, best_word_indices, scores_accumulated, constraints, inactive = lexical_constraints.topk(
+                    t,
+                    batch_size,
+                    self.beam_size,
+                    inactive,
+                    scores,
+                    constraints,
+                    best_hyp_indices,
+                    best_word_indices,
+                    scores_accumulated)
+            finished = self.sort_by_index.forward(best_hyp_indices, finished)[0]
+            state = self.sort_state_by_index.forward(best_hyp_indices, state)
+            finished, scores_accumulated, lengths = self.update_finished.forward(best_word_indices,
+                                                                                 max_output_lengths,
+                                                                                 finished,
+                                                                                 scores_accumulated,
+                                                                                 lengths)
+            best_hyp_indices_list.append(best_hyp_indices)
+            best_word_indices_list.append(best_word_indices)
+            if finished.sum().item() == batch_size * self.beam_size:
                 break
+        folded_accumulated_scores = scores_accumulated.reshape((batch_size,
+                                                                self.beam_size * scores_accumulated.shape[-1]))
+        indices = torch.argsort(folded_accumulated_scores, dim=1).type(torch.int32).reshape((-1,))
+        best_hyp_indices, _ = self.unravel_index(indices, scores_accumulated.shape)
+        best_hyp_indices = best_hyp_indices + offset
+        best_hyp_indices_list.append(best_hyp_indices)
+        lengths = lengths[best_hyp_indices.type(torch.long)]
+        scores_accumulated = torch.take(scores_accumulated, best_hyp_indices.type(torch.long))
+        constraints = [constraints[x] for x in best_hyp_indices.cpu().numpy()]
 
-            # Take a step. This get the predicted log probs of the next classes
-            # and updates the state.
-            # shape: (batch_size * beam_size, num_classes)
-            class_log_probabilities, state = step(last_predictions, state, False)
+        best_hyp_indices = torch.stack(best_hyp_indices_list, dim=1).cpu().numpy()
+        best_word_indices = torch.stack(best_word_indices_list, dim=1).cpu().numpy()
+        batch_size = best_hyp_indices.shape[0] // self.beam_size
 
-            # shape: (batch_size * beam_size, num_classes)
-            last_predictions_expanded = last_predictions.unsqueeze(-1).expand(
-                    batch_size * self.beam_size,
-                    num_classes
-            )
+        nbest_translations = []  # type: List[List[Translation]]
+        for n in range(0, self.beam_size):
 
-            # Here we are finding any beams where we predicted the end token in
-            # the previous timestep and replacing the distribution with a
-            # one-hot distribution, forcing the beam to predict the end token
-            # this timestep as well.
-            # shape: (batch_size * beam_size, num_classes)
-            cleaned_log_probabilities = torch.where(
-                    last_predictions_expanded == self._end_index,
-                    log_probs_after_end,
-                    class_log_probabilities
-            )
+            # Initialize the best_ids to the first item in each batch, plus current nbest index
+            best_ids = np.arange(n, batch_size * self.beam_size, self.beam_size, dtype='int32')
 
-            # shape (both): (batch_size * beam_size, per_node_beam_size)
-            top_log_probabilities, predicted_classes = \
-                cleaned_log_probabilities.topk(self.per_node_beam_size)
+            # only check for constraints for 1-best translation for each sequence in batch
+            if n == 0 and any(constraints):
+                # For constrained decoding, select from items that have met all constraints (might not be finished)
+                unmet = np.array([c.num_needed() if c is not None else 0 for c in constraints])
+                filtered = np.where(unmet == 0, scores_accumulated.cpu().numpy().flatten(), np.inf)
+                filtered = filtered.reshape((batch_size, self.beam_size))
+                best_ids += np.argmin(filtered, axis=1).astype('int32')
 
-            # Here we expand the last log probabilities to (batch_size * beam_size, per_node_beam_size)
-            # so that we can add them to the current log probs for this timestep.
-            # This lets us maintain the log probability of each element on the beam.
-            # shape: (batch_size * beam_size, per_node_beam_size)
-            expanded_last_log_probabilities = last_log_probabilities.\
-                    unsqueeze(2).\
-                    expand(batch_size, self.beam_size, self.per_node_beam_size).\
-                    reshape(batch_size * self.beam_size, self.per_node_beam_size)
+            # Obtain sequences for all best hypotheses in the batch
+            indices = self.get_best_word_indices_for_kth_hypotheses(best_ids, best_hyp_indices)  # type: np.ndarray
+            # pylint: disable=unsubscriptable-object
+            nbest_translations.append(
+                [self._assemble_translation(*x) for x in zip(best_word_indices[indices, np.arange(indices.shape[1])],
+                                                             lengths[best_ids],
+                                                             scores_accumulated[best_ids],)])
 
-            # shape: (batch_size * beam_size, per_node_beam_size)
-            summed_top_log_probabilities = top_log_probabilities + expanded_last_log_probabilities
-
-            # shape: (batch_size, beam_size * per_node_beam_size)
-            reshaped_summed = summed_top_log_probabilities.\
-                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
-
-            # shape: (batch_size, beam_size * per_node_beam_size)
-            reshaped_predicted_classes = predicted_classes.\
-                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
-
-            # Keep only the top `beam_size` beam indices.
-            # shape: (batch_size, beam_size), (batch_size, beam_size)
-            restricted_beam_log_probs, restricted_beam_indices = reshaped_summed.topk(self.beam_size)
-
-            # Use the beam indices to extract the corresponding classes.
-            # shape: (batch_size, beam_size)
-            restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices)
-
-            predictions.append(restricted_predicted_classes)
-
-            # shape: (batch_size, beam_size)
-            last_log_probabilities = restricted_beam_log_probs
-
-            # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
-            # indices with a common ancestor are grouped together. Hence
-            # dividing by per_node_beam_size gives the ancestor. (Note that this is integer
-            # division as the tensor is a LongTensor.)
-            # shape: (batch_size, beam_size)
-            backpointer = restricted_beam_indices / self.per_node_beam_size
-
-            backpointers.append(backpointer)
-
-            # Keep only the pieces of the state tensors corresponding to the
-            # ancestors created this iteration.
-            for key, state_tensor in state.items():
-                _, *last_dims = state_tensor.size()
-                # shape: (batch_size, beam_size, *)
-                expanded_backpointer = backpointer.\
-                        view(batch_size, self.beam_size, *([1] * len(last_dims))).\
-                        expand(batch_size, self.beam_size, *last_dims)
-
-                # shape: (batch_size * beam_size, *)
-                state[key] = state_tensor.\
-                        reshape(batch_size, self.beam_size, *last_dims).\
-                        gather(1, expanded_backpointer).\
-                        reshape(batch_size * self.beam_size, *last_dims)
-
-        if not torch.isfinite(last_log_probabilities).all():
-            warnings.warn("Infinite log probabilities encountered. Some final sequences may not make sense. "
-                          "This can happen when the beam size is larger than the number of valid (non-zero "
-                          "probability) transitions that the step function produces.",
-                          RuntimeWarning)
-
-        # Reconstruct the sequences.
-        # shape: [(batch_size, beam_size, 1)]
-        reconstructed_predictions = [predictions[-1].unsqueeze(2)]
-
-        # shape: (batch_size, beam_size)
-        cur_backpointers = backpointers[-1]
-
-        for timestep in range(len(predictions) - 2, 0, -1):
-            # shape: (batch_size, beam_size, 1)
-            cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
-
-            reconstructed_predictions.append(cur_preds)
-
-            # shape: (batch_size, beam_size)
-            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
-
-        # shape: (batch_size, beam_size, 1)
-        final_preds = predictions[0].gather(1, cur_backpointers).unsqueeze(2)
-
-        reconstructed_predictions.append(final_preds)
-
-        # shape: (batch_size, beam_size, max_steps)
-        all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
-
-        return all_predictions, last_log_probabilities
+        return nbest_translations

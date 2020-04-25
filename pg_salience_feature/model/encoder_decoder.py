@@ -15,7 +15,7 @@ from allennlp.nn.util import get_lengths_from_binary_sequence_mask
 from torch.distributions import Categorical
 from torch.nn import NLLLoss
 
-from pg_salience_feature.inference.constrained_beam_search import ConstrainedBeamSearch
+from pg_salience_feature.inference.beam_search import BeamSearch
 from pg_salience_feature.module.decoder import Decoder
 from pg_salience_feature.module.encoder import Encoder
 
@@ -36,11 +36,11 @@ class EncoderDecoder(Model):
                  decoder: Decoder,
                  vocab: Vocabulary,
                  teacher_force_ratio: float,
+                 beam_search: BeamSearch,
                  use_copy_mechanism: bool = True,
                  salience_source_mixer: SalienceSourceMixer = None,
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
-        # TODO: Workon BeamSearch, try to switch to OpenNMT BeamSearch but implement our own beamsearch first
         self.salience_source_mixer = salience_source_mixer
         self.coverage_lambda = coverage_lambda
         self.use_copy_mechanism = use_copy_mechanism
@@ -63,9 +63,8 @@ class EncoderDecoder(Model):
         self.start_idx = self.vocab.get_token_index(START_SYMBOL)
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
-        self.beam_size = 10
-        self.beam = ConstrainedBeamSearch(self.end_idx, self.start_idx, self.vocab.get_vocab_size(),
-                                          max_steps=self.max_steps, beam_size=self.beam_size)
+        self.beam_search = beam_search
+        self.beam_search.config_beam(end_index=self.end_idx, max_steps=self.max_steps)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
@@ -120,7 +119,7 @@ class EncoderDecoder(Model):
                              source_ids: Dict[str, torch.Tensor],
                              source_text: List[List[str]],
                              raw_constraints: List) -> Dict[str, List]:
-        """Make forward pass during prediction using a beam search."""
+        """Make forward pass during prediction using a beam_search search."""
         state = self.init_dec_state(state)
         state['source_ids'] = source_ids['ids']
         state['max_oov'] = source_ids['max_oov']
@@ -129,7 +128,7 @@ class EncoderDecoder(Model):
 
         # shape (all_top_k_predictions): (batch_size, beam_size, num_decoding_steps)
         # shape (log_probabilities): (batch_size, beam_size)
-        n_best_translations = self.beam.search(
+        n_best_translations = self.beam_search.search(
             start_predictions, state, self.take_step, raw_constraints)
         n_system_summaries = []
         for best_translations in n_best_translations:
@@ -190,7 +189,7 @@ class EncoderDecoder(Model):
                   state: Dict[str, torch.Tensor],
                   is_first_step: bool = False) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
-        Take a decoding step. This is called by the beam search class.
+        Take a decoding step. This is called by the beam_search search class.
 
         Parameters
         ----------

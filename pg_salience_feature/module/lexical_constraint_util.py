@@ -11,6 +11,7 @@ class UpdateScores(Module):
 
     def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist):
         scores = target_dists + scores_accumulated
+        # If finished or inactive, set the score to INF all except for padding token (idx 0)
         scores = torch.where((finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.bool), torch.cat((scores_accumulated, pad_dist), dim=1), scores)
         return scores
 
