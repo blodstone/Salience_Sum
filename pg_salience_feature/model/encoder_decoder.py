@@ -282,7 +282,7 @@ class EncoderDecoder(Model):
         state = self.init_enc_state(source_tokens)
         embedded_src = self.source_embedder(source_tokens)
         emb_salience_feature = None
-        if salience_values is not None:
+        if salience_values is not None and self.salience_source_mixer is not None:
             embedded_src, emb_salience_feature = self.salience_source_mixer(
                 salience_values, embedded_src)
         # final_state = (last state, last context)
