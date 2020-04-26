@@ -122,7 +122,7 @@ class ConstrainedHypothesis:
 
     def allowed(self) -> Set[int]:
         """
-        Returns the set/home/acp16hh/Projects/Research/Experiments/Exp_Gwen_Saliency_Summ/src/Salience_Sum/data/bbc_dev/ready/test.constraint.tsv of constrained words that could follow this one.
+        Returns the set of constrained words that could follow this one.
         For unfinished phrasal constraints, it is the next word in the phrase.
         In other cases, it is the list of all unmet constraints.
         If all constraints are met, an empty set is returned.
@@ -140,6 +140,7 @@ class ConstrainedHypothesis:
         else:
             for i, word_id in enumerate(self.constraints):
                 if not self.met[i] and (i == 0 or not self.is_sequence[i - 1]):
+                    # The self.num_needed() is checked in case the 'eos' is part of the constraint
                     if word_id != self.eos_id or self.num_needed() == 1:
                         items.add(word_id)
 
@@ -196,6 +197,7 @@ class ConstrainedHypothesis:
         else:
             # Build a list from all constraints of tuples of the
             # form (constraint, whether it's a non-initial sequential, whether it's been met)
+            # is.sequence is shifted to the right one place because we want to check the previous token
             constraint_tuples = list(zip(obj.constraints, [False] + obj.is_sequence[:-1], obj.met))
             # We are searching for an unmet constraint (word_id) that is not the middle of a phrase and is not met
             query = (word_id, False, False)
@@ -353,8 +355,9 @@ def _sequential_topk(timestep: int,
         for col in nextones:
             new_item = hyp.advance(col)
             score = scores[row, col].item()
-            cand = ConstrainedCandidate(row, col, score, new_item)
-            candidates.add(cand)
+            if score != float('Inf'):
+                cand = ConstrainedCandidate(row, col, score, new_item)
+                candidates.add(cand)
 
     # Sort the candidates. After allocating the beam_search across the banks, we will pick the top items
     # for each bank from this list
