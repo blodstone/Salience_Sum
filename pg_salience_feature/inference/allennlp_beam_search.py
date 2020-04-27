@@ -3,16 +3,18 @@ import warnings
 
 import torch
 
+from allennlp.common import Registrable
 from allennlp.common.checks import ConfigurationError
-
+from pg_salience_feature.inference.common_beam_search import CommonBeamSearch
 
 StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType, bool], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
 
 
-class BeamSearch:
+@CommonBeamSearch.register('allennlp_beam_search')
+class AllenNLPBeamSearch(CommonBeamSearch):
     """
-    Implements the beam_search search algorithm for decoding the most likely sequences.
+    Implements the beam search algorithm for decoding the most likely sequences.
 
     Parameters
     ----------
@@ -22,7 +24,7 @@ class BeamSearch:
         The maximum number of decoding steps to take, i.e. the maximum length
         of the predicted sequences.
     beam_size : ``int``, optional (default = 10)
-        The width of the beam_search used.
+        The width of the beam used.
     per_node_beam_size : ``int``, optional (default = beam_size)
         The maximum number of candidates to consider per node, at each step in the search.
         If not given, this just defaults to ``beam_size``. Setting this parameter
@@ -32,21 +34,24 @@ class BeamSearch:
     """
 
     def __init__(self,
-                 end_index: int,
-                 max_steps: int = 50,
                  beam_size: int = 10,
                  per_node_beam_size: int = None) -> None:
-        self._end_index = end_index
-        self.max_steps = max_steps
+        self.end_index = None
+        self.max_steps = None
         self.beam_size = beam_size
         self.per_node_beam_size = per_node_beam_size or beam_size
+
+    def config_beam(self, end_index: int, max_steps: int):
+        self.end_index = end_index
+        self.max_steps = max_steps
 
     def search(self,
                start_predictions: torch.Tensor,
                start_state: StateType,
-               step: StepFunctionType) -> Tuple[torch.Tensor, torch.Tensor]:
+               step: StepFunctionType,
+               raw_constraints: None) -> List:
         """
-        Given a starting state and a step function, apply beam_search search to find the
+        Given a starting state and a step function, apply beam search to find the
         most likely target sequences.
 
         Notes
@@ -54,7 +59,7 @@ class BeamSearch:
         If your step function returns ``-inf`` for some log probabilities
         (like if you're using a masked log-softmax) then some of the "best"
         sequences returned may also have ``-inf`` log probability. Specifically
-        this happens when the beam_search size is smaller than the number of actions
+        this happens when the beam size is smaller than the number of actions
         with finite log probability (non-zero probability) returned by the step function.
         Therefore if you're using a mask you may want to check the results from ``search``
         and potentially discard sequences with non-finite log probability.
@@ -105,7 +110,7 @@ class BeamSearch:
         # because we are going from a single decoder input (the output from the
         # encoder) to the top `beam_size` decoder outputs. On the other hand,
         # within the main loop we are going from the `beam_size` elements of the
-        # beam_search to `beam_size`^2 candidates from which we will select the top
+        # beam to `beam_size`^2 candidates from which we will select the top
         # `beam_size` elements for the next iteration.
         # shape: (batch_size, num_classes)
         start_class_log_probabilities, state = step(start_predictions, start_state, True)
@@ -120,9 +125,9 @@ class BeamSearch:
 
         # shape: (batch_size, beam_size), (batch_size, beam_size)
         start_top_log_probabilities, start_predicted_classes = \
-                start_class_log_probabilities.topk(self.beam_size)
-        if self.beam_size == 1 and (start_predicted_classes == self._end_index).all():
-            warnings.warn("Empty sequences predicted. You may want to increase the beam_search size or ensure "
+                start_class_log_probabilities.topk(self.beam_size, largest=False)
+        if self.beam_size == 1 and (start_predicted_classes == self.end_index).all():
+            warnings.warn("Empty sequences predicted. You may want to increase the beam size or ensure "
                           "your step function is working properly.",
                           RuntimeWarning)
             return start_predicted_classes.unsqueeze(-1), start_top_log_probabilities
@@ -138,11 +143,11 @@ class BeamSearch:
         # shape: (batch_size * beam_size, num_classes)
         log_probs_after_end = start_class_log_probabilities.new_full(
                 (batch_size * self.beam_size, num_classes),
-                float("-inf")
+                float("Inf")
         )
-        log_probs_after_end[:, self._end_index] = 0.
+        log_probs_after_end[:, self.end_index] = 0.
 
-        # Set the same state for each element in the beam_search.
+        # Set the same state for each element in the beam.
         for key, state_tensor in state.items():
             _, *last_dims = state_tensor.size()
             # shape: (batch_size * beam_size, *)
@@ -157,7 +162,7 @@ class BeamSearch:
 
             # If every predicted token from the last step is `self._end_index`,
             # then we can stop early.
-            if (last_predictions == self._end_index).all():
+            if (last_predictions == self.end_index).all():
                 break
 
             # Take a step. This get the predicted log probs of the next classes
@@ -173,18 +178,18 @@ class BeamSearch:
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
-            # one-hot distribution, forcing the beam_search to predict the end token
+            # one-hot distribution, forcing the beam to predict the end token
             # this timestep as well.
             # shape: (batch_size * beam_size, num_classes)
             cleaned_log_probabilities = torch.where(
-                    last_predictions_expanded == self._end_index,
+                    last_predictions_expanded == self.end_index,
                     log_probs_after_end,
                     class_log_probabilities
             )
 
             # shape (both): (batch_size * beam_size, per_node_beam_size)
             top_log_probabilities, predicted_classes = \
-                cleaned_log_probabilities.topk(self.per_node_beam_size)
+                cleaned_log_probabilities.topk(self.per_node_beam_size, largest=False)
 
             # Here we expand the last log probabilities to (batch_size * beam_size, per_node_beam_size)
             # so that we can add them to the current log probs for this timestep.
@@ -206,11 +211,12 @@ class BeamSearch:
             reshaped_predicted_classes = predicted_classes.\
                     reshape(batch_size, self.beam_size * self.per_node_beam_size)
 
-            # Keep only the top `beam_size` beam_search indices.
+            # Keep only the top `beam_size` beam indices.
             # shape: (batch_size, beam_size), (batch_size, beam_size)
-            restricted_beam_log_probs, restricted_beam_indices = reshaped_summed.topk(self.beam_size)
+            restricted_beam_log_probs, restricted_beam_indices = \
+                reshaped_summed.topk(self.beam_size, largest=False)
 
-            # Use the beam_search indices to extract the corresponding classes.
+            # Use the beam indices to extract the corresponding classes.
             # shape: (batch_size, beam_size)
             restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices)
 
@@ -219,7 +225,7 @@ class BeamSearch:
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
 
-            # The beam_search indices come from a `beam_size * per_node_beam_size` dimension where the
+            # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
             # indices with a common ancestor are grouped together. Hence
             # dividing by per_node_beam_size gives the ancestor. (Note that this is integer
             # division as the tensor is a LongTensor.)
@@ -245,7 +251,7 @@ class BeamSearch:
 
         if not torch.isfinite(last_log_probabilities).all():
             warnings.warn("Infinite log probabilities encountered. Some final sequences may not make sense. "
-                          "This can happen when the beam_search size is larger than the number of valid (non-zero "
+                          "This can happen when the beam size is larger than the number of valid (non-zero "
                           "probability) transitions that the step function produces.",
                           RuntimeWarning)
 
@@ -272,5 +278,15 @@ class BeamSearch:
 
         # shape: (batch_size, beam_size, max_steps)
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
-
-        return all_predictions, last_log_probabilities
+        n_system_idx = []
+        for beam in all_predictions.split(1, dim=1):
+            system_idx = []
+            for batch in beam.split(1, dim=0):
+                predict_idx = []
+                for idx in batch.squeeze():
+                    if type(idx) != int:
+                        idx = idx.item()
+                    predict_idx.append(idx)
+                system_idx.append(predict_idx)
+            n_system_idx.append(system_idx)
+        return n_system_idx

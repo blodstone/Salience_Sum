@@ -15,7 +15,7 @@ from allennlp.nn.util import get_lengths_from_binary_sequence_mask
 from torch.distributions import Categorical
 from torch.nn import NLLLoss
 
-from pg_salience_feature.inference.beam_search import BeamSearch
+from pg_salience_feature.inference.common_beam_search import CommonBeamSearch
 from pg_salience_feature.module.decoder import Decoder
 from pg_salience_feature.module.encoder import Encoder
 
@@ -32,15 +32,17 @@ class EncoderDecoder(Model):
                  target_embedder: TextFieldEmbedder,
                  coverage_lambda: float,
                  max_steps: int,
+                 is_result_rouge_ranked: bool,
                  encoder: Encoder,
                  decoder: Decoder,
                  vocab: Vocabulary,
                  teacher_force_ratio: float,
-                 beam_search: BeamSearch,
+                 beam_search: CommonBeamSearch,
                  use_copy_mechanism: bool = True,
                  salience_source_mixer: SalienceSourceMixer = None,
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
+        self.is_result_rouge_ranked = is_result_rouge_ranked
         self.salience_source_mixer = salience_source_mixer
         self.coverage_lambda = coverage_lambda
         self.use_copy_mechanism = use_copy_mechanism
@@ -128,16 +130,14 @@ class EncoderDecoder(Model):
 
         # shape (all_top_k_predictions): (batch_size, beam_size, num_decoding_steps)
         # shape (log_probabilities): (batch_size, beam_size)
-        n_best_translations = self.beam_search.search(
+        n_system_idx = self.beam_search.search(
             start_predictions, state, self.take_step, raw_constraints)
         n_system_summaries = []
-        for best_translations in n_best_translations:
+        for batch_idx, system_idx in enumerate(n_system_idx):
             system_summaries = []
-            for batch_idx, translation in enumerate(best_translations):
+            for predict_idx in system_idx:
                 predict_tokens = []
-                for idx in translation.target_ids:
-                    if type(idx) != int:
-                        idx = idx.item()
+                for idx in predict_idx:
                     if idx < self.vocab.get_vocab_size():
                         token = self.vocab.get_token_from_index(idx)
                     else:
@@ -152,31 +152,18 @@ class EncoderDecoder(Model):
                     predict_tokens.append(token)
                 system_summaries.append(predict_tokens)
             n_system_summaries.append(system_summaries)
-        # all = []
-        # for i in range(all_top_k_predictions.shape[1]):
-        #     system_summaries = []
-        #     for batch_prediction in all_top_k_predictions[:, i, :].split(1, dim=1):
-        #         predict_tokens = []
-        #         for batch_idx, idx in enumerate(batch_prediction):
-        #             idx = idx.item()
-        #             if idx < self.vocab.get_vocab_size():
-        #                 token = self.vocab.get_token_from_index(idx)
-        #             else:
-        #                 token = source_text[batch_idx][
-        #                     (source_ids['ids'][batch_idx, :] == idx).nonzero().squeeze()[0].item()]
-        #             predict_tokens.append(token)
-        #         # predict_idx = [self.vocab.get_token_from_index(idx.item()) for idx in prediction.squeeze()]
-        #         system_summaries.append(predict_tokens)
-        #         # (source_ids['ids'][0, :] == 50003).nonzero().squeeze()[0].item()
-        #         all.append(system_summaries)
-        max_score = {batch: -1 for batch in range(len(n_system_summaries[0]))}
-        best_summary = {batch: '' for batch in range(len(n_system_summaries[0]))}
-        for system_summaries in n_system_summaries:
-            for batch, summary in enumerate(system_summaries):
-                score = len(set(source_text[batch]).intersection(set(summary)))
-                if score > max_score[batch]:
-                    max_score[batch] = score
-                    best_summary[batch] = summary
+        if self.is_result_rouge_ranked:
+            max_score = {batch: -1 for batch in range(len(n_system_summaries[0]))}
+            best_summary = {batch: '' for batch in range(len(n_system_summaries[0]))}
+            for system_summaries in n_system_summaries:
+                for batch, summary in enumerate(system_summaries):
+                    score = len(set(source_text[batch]).intersection(set(summary)))
+                    if score > max_score[batch]:
+                        max_score[batch] = score
+                        best_summary[batch] = summary
+        else:
+            for system_summaries in n_system_summaries:
+                pass
         output_dict = {
             "predictions": [summ for batch, summ in best_summary.items()]
         }
@@ -263,7 +250,7 @@ class EncoderDecoder(Model):
             output_dict['loss'] = self._compute_loss(target_tokens, target_ids, state)
 
         if not self.training and not target_tokens:
-            raw_constraints = None
+            raw_constraints = []
             if raw_constraint:
                 raw_constraints, word_constraints = \
                     self.update_constraint_idx(raw_constraint, source_text, source_ids)

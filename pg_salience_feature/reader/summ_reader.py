@@ -60,7 +60,10 @@ class SummDataReader(DatasetReader):
                 if line == '':
                     continue
                 try:
-                    if self._use_constraint:
+                    sequence = line.split('\t')
+                    # With constraint the length is three, we still read it even though
+                    # there is a chance we don't use the constraint
+                    if len(sequence) == 3:
                         src_seq, tgt_seq, const_seq = line.split('\t')
                     else:
                         src_seq, tgt_seq = line.split('\t')
