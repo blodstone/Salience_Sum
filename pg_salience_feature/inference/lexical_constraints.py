@@ -161,8 +161,8 @@ class ConstrainedHypothesis:
         :param wordid: The wordid to validate.
         :return: True if all constraints are already met or the word ID is not the EOS id.
         """
-        # return True
-        return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
+        return True
+        # return self.finished() or wordid != self.eos_id or (self.num_needed() == 1 and self.eos_id in self.allowed())
 
     def advance(self, word_id: int) -> 'ConstrainedHypothesis':
         """
@@ -373,13 +373,28 @@ def _sequential_topk(timestep: int,
 
     # Sort the candidates into the allocated banks
     pruned_candidates = []  # type: List[ConstrainedCandidate]
+    left_over_candidates = []
     for i, cand in enumerate(sorted_candidates):
         bank = cand.hypothesis.num_met()
 
         if bank_sizes[bank] > 0:
             pruned_candidates.append(cand)
             bank_sizes[bank] -= 1
-
+        else:
+            left_over_candidates.append(cand)
+    if len(left_over_candidates) > 0:
+        needed_cand = int(beam_size * 0.1) - len(
+            [cand for cand in pruned_candidates if cand.score <= left_over_candidates[0].score])
+        if needed_cand <= len(left_over_candidates):
+            reserve_top_k = needed_cand
+        else:
+            reserve_top_k = len(left_over_candidates)
+        i = 0
+        while reserve_top_k > 0:
+            pruned_candidates[-reserve_top_k] = left_over_candidates[i]
+            reserve_top_k -= 1
+            i += 1
+    pruned_candidates = sorted(pruned_candidates, key=attrgetter('score'))
     num_pruned_candidates = len(pruned_candidates)
 
     inactive[:num_pruned_candidates] = 0

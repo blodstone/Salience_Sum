@@ -88,6 +88,7 @@ class BeamSearch(CommonBeamSearch):
         self.hyp_sampling = hyp_sampling
         self.top_p = top_p
         self.end_index = 0
+        self.unk_index = 0
         self.max_steps = 100
         self.update_finished = None
         self.is_beam_configured = False
@@ -99,8 +100,9 @@ class BeamSearch(CommonBeamSearch):
         self.sort_state_by_index = SortStateByIndex()
         self.prune_hyp = PruneHypotheses(threshold=20, beam_size=self.beam_size)
 
-    def config_beam(self, end_index: int, max_steps: int):
+    def config_beam(self, end_index: int, unk_index: int, max_steps: int):
         self.end_index = end_index
+        self.unk_index = unk_index
         self.max_steps = max_steps
         self.update_finished = NormalizeAndUpdateFinished(0, self.end_index)
         self.is_beam_configured = True
@@ -112,8 +114,22 @@ class BeamSearch(CommonBeamSearch):
             index = index // dim
         return tuple(reversed(out))
 
-    def sample_topk(self, scores: torch.Tensor,
-                    offset: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def sample_topk2(self, scores, target_dists, finished):
+        # Map the negative logprobs to probabilities so as to have a distribution
+        target_dists = torch.exp(-target_dists)
+        # Sample from the target distributions over words, then get the corresponding values from the cumulative scores
+        best_word_indices = target_dists.multinomial(1)
+        # Zeroes for finished hypotheses.
+        best_word_indices = torch.where(finished.type(torch.bool).unsqueeze(1), torch.zeros_like(best_word_indices), best_word_indices)
+        values = scores.take(best_word_indices)
+        best_hyp_indices = torch.arange(0, target_dists.shape[0], dtype=torch.int32, device=target_dists.device)
+
+        return best_hyp_indices, best_word_indices.squeeze(), values
+
+    def sample_topk(self,
+                    scores: torch.Tensor,
+                    offset: torch.Tensor,
+                    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
             Choose an extension of each hypothesis from its softmax distribution.
 
@@ -338,37 +354,26 @@ class BeamSearch(CommonBeamSearch):
         for t in range(1, self.max_steps):
             # shape: (batch_size, num_classes)
             target_dists, state = step(best_word_indices.type(torch.long), state, True)
-            if self.top_p < 1.0:
-                prob_scores = torch.exp(-target_dists)
-                sorted_probs, sorted_indices = prob_scores.sort(dim=1, descending=True)
 
-                cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
-                sorted_indices_to_remove = cumulative_probs > self.top_p
-                sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-                sorted_indices_to_remove[:, 0] = 0
-                sorted_samp_probs = sorted_probs.clone()
-                sorted_samp_probs[sorted_indices_to_remove] = 0
-                # m = 1 for interpolation of 0 value
-                # if m is not None:
-                #     sorted_samp_probs.div_(sorted_samp_probs.sum(1).unsqueeze(1))
-                #     sorted_samp_probs.mul_(1 - m)
-                #     sorted_samp_probs.add_(sorted_probs.mul(m))
-                orig_indices_to_remove = torch.empty_like(sorted_indices_to_remove, device=device)
-                orig_indices_to_remove.scatter_(1, sorted_indices, sorted_indices_to_remove)
-                target_dists[orig_indices_to_remove] = float('Inf')
             if not is_pad_dist_set:
                 pad_dist = torch.full((batch_size * self.beam_size, target_dists.shape[-1] - 1),
                                       fill_value=float('Inf'), device=device)
                 is_pad_dist_set = True
+
             scores = self.update_scores.forward(target_dists, finished,
-                                                inactive, scores_accumulated, pad_dist)
-            if t == 1:
-                scores *= first_step_mask
+                                                inactive, scores_accumulated, pad_dist, 1.0)
+
             if self.hyp_sampling == 'sample':
-                pick = self.sample_topk
-            else:
-                pick = self.topk
-            best_hyp_indices, best_word_indices, scores_accumulated = pick(scores, offset)
+                best_hyp_indices, best_word_indices, scores_accumulated = \
+                    self.sample_topk2(scores, target_dists, finished)
+            elif self.hyp_sampling == 'greedy':
+                if t == 1:
+                    scores *= first_step_mask
+                best_hyp_indices, best_word_indices, scores_accumulated = self.topk(scores, offset)
+            scores = self.update_scores.forward(target_dists, finished,
+                                                inactive, scores_accumulated, pad_dist, self.top_p)
+            # scores = self.update_scores.forward(target_dists, finished,
+            #                                     inactive, saved_scores_accumulated, pad_dist, self.top_p/2)
             if any(raw_constraint_list):
                 best_hyp_indices, best_word_indices, scores_accumulated, constraints, inactive = \
                     lexical_constraints.topk(
@@ -392,6 +397,16 @@ class BeamSearch(CommonBeamSearch):
             inactive, best_word_indices, scores_accumulated = self.prune_hyp.forward(best_word_indices,
                                                                                      scores_accumulated,
                                                                                      finished)
+            # Replace unknown with attention
+            attention = state['attention']
+            best_word_indices = best_word_indices.reshape((batch_size, -1))
+            _, top_idx = attention.reshape((batch_size, -1, attention.shape[1], attention.shape[2])).topk(1, dim=2)
+            for i in range(batch_size):
+                for j in range(self.beam_size):
+                    if best_word_indices[i][j] == self.unk_index:
+                        best_word_indices[i][j] = top_idx.squeeze()[i][j]
+            best_word_indices = best_word_indices.reshape((-1, ))
+
             best_hyp_indices_list.append(best_hyp_indices)
             best_word_indices_list.append(best_word_indices)
             if finished.sum().item() == batch_size * self.beam_size:
@@ -443,3 +458,5 @@ class BeamSearch(CommonBeamSearch):
                 system_idx.append(predict_idx)
             n_system_idx.append(system_idx)
         return n_system_idx
+
+

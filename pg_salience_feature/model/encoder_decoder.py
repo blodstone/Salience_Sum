@@ -66,7 +66,8 @@ class EncoderDecoder(Model):
         self.end_idx = self.vocab.get_token_index(END_SYMBOL)
         self.unk_idx = self.vocab.get_token_index(DEFAULT_OOV_TOKEN)
         self.beam_search = beam_search
-        self.beam_search.config_beam(end_index=self.end_idx, max_steps=self.max_steps)
+        self.beam_search.config_beam(end_index=self.end_idx,
+                                     max_steps=self.max_steps, unk_index=self.unk_idx)
         self.criterion = NLLLoss(ignore_index=self.padding_idx)
         self.coverage_loss = 0.0
         self.p_gen = 0.0
@@ -106,6 +107,79 @@ class EncoderDecoder(Model):
         }
         return state
 
+    # def weighted_rouge(self):
+    #
+    #     def numH(w, H):
+    #         result = 0
+    #         H_group = H.groupby('result_id')
+    #         highlights = {}
+    #         for result_id, data in H_group:
+    #             if result_id not in highlights.keys():
+    #                 highlights[result_id] = data['indexes']
+    #             else:
+    #                 highlights[result_id].append(data['indexes'])
+    #         for result_id in highlights.keys():
+    #             h_words = list(chain(*[highlight for highlight in highlights[result_id]]))
+    #             if w in h_words:
+    #                 result += len(h_words) / MAX_LEN
+    #         return result
+    #
+    #     def beta(n, g, w, H):
+    #         numerator = 0
+    #         denominator = 0
+    #         m = len(w[0])
+    #         for i in range(m - n + 1):
+    #             total_NumH = 0
+    #             for j in range(i, i + n):
+    #                 if w[0][i:i + n] == list(g):
+    #                     total_NumH += numH(w[1][j], H)
+    #             total_NumH /= 10
+    #             total_NumH /= n
+    #             numerator += total_NumH
+    #         for i in range(m - n + 1):
+    #             if w[0][i:i + n] == list(g):
+    #                 denominator += 1
+    #         if denominator == 0 or numerator == 0:
+    #             return 0
+    #         return numerator / denominator
+    #
+    #     def R_rec(n, S, D, H):
+    #         # stemD = [stemmer.stem(d) for d in D[0]]
+    #         # stemS = [stemmer.stem(s) for s in S]
+    #         n_gram_D = list(ngrams(D[0], n))
+    #         count_n_gram_D = Counter(n_gram_D)
+    #         n_gram_S = list(ngrams(S, n))
+    #         count_n_gram_S = Counter(n_gram_S)
+    #
+    #         n_gram_DnS = set(n_gram_S).intersection(set(n_gram_D))
+    #         numerator = 0
+    #         for g in n_gram_DnS:
+    #             # numerator += 1 * min(count_n_gram_D[g], count_n_gram_S[g])
+    #             numerator += beta(n, g, D, H) * min(count_n_gram_D[g], count_n_gram_S[g])
+    #         denominator = 0
+    #         for g in set(n_gram_D):
+    #             denominator += beta(n, g, D, H) * count_n_gram_D[g]
+    #             # denominator += 1 * count_n_gram_D[g]
+    #         return numerator / max(denominator, 1)
+    #
+    #     def R_prec(n, S, D, H):
+    #         # stemD = [stemmer.stem(d) for d in D[0]]
+    #         # stemS = [stemmer.stem(s) for s in S]
+    #         n_gram_D = list(ngrams(D[0], n))
+    #         count_n_gram_D = Counter(n_gram_D)
+    #         n_gram_S = list(ngrams(S, n))
+    #         count_n_gram_S = Counter(n_gram_S)
+    #         n_gram_DnS = set(n_numHgram_S).intersection(set(n_gram_D))
+    #         numerator = 0
+    #         for g in n_gram_DnS:
+    #             # numerator += 1 * min(count_n_gram_D[g], count_n_gram_S[g])
+    #             numerator += beta(n, g, D, H) * min(count_n_gram_D[g], count_n_gram_S[g])
+    #         denominator = 0
+    #         for g in set(n_gram_S):
+    #             # denominator += beta(n, g, D, H) * count_n_gram_S[g]
+    #             denominator += 1 * count_n_gram_S[g]
+    #         return numerator / max(denominator, 1)
+
     def init_dec_state(self, state: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         states = state['encoder_states']
         batch_size = states.size(0)
@@ -133,9 +207,9 @@ class EncoderDecoder(Model):
         n_system_idx = self.beam_search.search(
             start_predictions, state, self.take_step, raw_constraints)
         n_system_summaries = []
-        for batch_idx, system_idx in enumerate(n_system_idx):
+        for system_idx in n_system_idx:
             system_summaries = []
-            for predict_idx in system_idx:
+            for batch_idx, predict_idx in enumerate(system_idx):
                 predict_tokens = []
                 for idx in predict_idx:
                     if idx < self.vocab.get_vocab_size():
@@ -157,7 +231,7 @@ class EncoderDecoder(Model):
             best_summary = {batch: '' for batch in range(len(n_system_summaries[0]))}
             for system_summaries in n_system_summaries:
                 for batch, summary in enumerate(system_summaries):
-                    score = len(set(source_text[batch]).intersection(set(summary)))
+                    score = len(set([token.text for token in source_text[batch]]).intersection(set(summary)))
                     if score > max_score[batch]:
                         max_score[batch] = score
                         best_summary[batch] = summary

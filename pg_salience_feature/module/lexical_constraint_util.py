@@ -9,12 +9,46 @@ class UpdateScores(Module):
     def __init__(self):
         super(UpdateScores, self).__init__()
 
-    def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist):
+    def forward(self, target_dists, finished, inactive, scores_accumulated, pad_dist, top_p, top_k=0):
+        if top_p < 1.0:
+            target_dists = self.nucleus_prune(target_dists, top_p)
+        elif top_k > 0:
+            pass
         scores = target_dists + scores_accumulated
         # If finished or inactive, set the score to INF all except for padding token (idx 0)
         scores = torch.where((finished.unsqueeze(1).type(torch.int32) | inactive.unsqueeze(1)).type(torch.bool), torch.cat((scores_accumulated, pad_dist), dim=1), scores)
         return scores
 
+    def nucleus_prune(self, target_dists, top_p):
+        min_tokens_to_keep = 1
+        prob_scores = torch.exp(-target_dists)
+        sorted_probs, sorted_indices = prob_scores.sort(dim=1, descending=True)
+        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
+        sorted_indices_to_remove = cumulative_probs > top_p
+        if min_tokens_to_keep >= 1:
+            # Keep at least min_tokens_to_keep (set to min_tokens_to_keep-1 because we add the first one below)
+            sorted_indices_to_remove = torch.cat(
+                [
+                    torch.zeros_like(
+                        sorted_indices_to_remove[:, :min_tokens_to_keep], device=target_dists.device),
+                    sorted_indices_to_remove[:, min_tokens_to_keep:],
+                ],
+                -1,
+            )
+        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
+        sorted_indices_to_remove[:, 0] = 0
+        sorted_samp_probs = sorted_probs.clone()
+        sorted_samp_probs[sorted_indices_to_remove] = 0
+
+        # m = 1 for interpolation of 0 value
+        # if m is not None:
+        #     sorted_samp_probs.div_(sorted_samp_probs.sum(1).unsqueeze(1))
+        #     sorted_samp_probs.mul_(1 - m)
+        #     sorted_samp_probs.add_(sorted_probs.mul(m))
+        orig_indices_to_remove = torch.empty_like(sorted_indices_to_remove, device=target_dists.device)
+        orig_indices_to_remove.scatter_(1, sorted_indices, sorted_indices_to_remove)
+        target_dists[orig_indices_to_remove] = float('Inf')
+        return target_dists
 
 class SortStateByIndex(Module):
     """
