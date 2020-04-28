@@ -24,7 +24,7 @@
         "coverage_lambda": 0,
         "beam_search": {
             "type": "beam_search",
-            "beam_size": 10,
+            "beam_size": 15,
             "top_p": 0.4,
             "hyp_sampling": "greedy"
         },

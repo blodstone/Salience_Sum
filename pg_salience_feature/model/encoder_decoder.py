@@ -5,6 +5,8 @@ from typing import Dict, Tuple, List
 import torch
 from nltk.util import ngrams
 from nltk.corpus import stopwords
+from rouge_score import rouge_scorer
+
 from allennlp.common.util import START_SYMBOL, END_SYMBOL
 from allennlp.data import Vocabulary
 from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, DEFAULT_OOV_TOKEN
@@ -227,14 +229,21 @@ class EncoderDecoder(Model):
                 system_summaries.append(predict_tokens)
             n_system_summaries.append(system_summaries)
         if self.is_result_rouge_ranked:
+            scores = {}
+            scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
             max_score = {batch: -1 for batch in range(len(n_system_summaries[0]))}
             best_summary = {batch: '' for batch in range(len(n_system_summaries[0]))}
             for system_summaries in n_system_summaries:
                 for batch, summary in enumerate(system_summaries):
-                    score = len(set([token.text for token in source_text[batch]]).intersection(set(summary)))
+                    if batch not in scores.keys():
+                        scores[batch] = []
+                    source = [token.text for token in source_text[batch]]
+                    score = scorer.score(' '.join(source), ' '.join(summary))['rougeL'].fmeasure
+                    scores[batch].append((score, summary))
                     if score > max_score[batch]:
                         max_score[batch] = score
                         best_summary[batch] = summary
+
         else:
             for system_summaries in n_system_summaries:
                 pass
