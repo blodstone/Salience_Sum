@@ -1,0 +1,87 @@
+{
+    "dataset_reader": {
+        "type": "summdatareader_salience_feature",
+        "interpolation": false,
+        "lazy": false,
+        "predict": false,
+        "source_max_tokens": 400,
+        "target_max_tokens": 100,
+        "use_salience": false
+    },
+    "iterator": {
+        "type": "bucket",
+        "batch_size": 16,
+        "padding_noise": 0,
+        "sorting_keys": [
+            [
+                "source_tokens",
+                "num_tokens"
+            ]
+        ]
+    },
+    "model": {
+        "type": "enc_dec_salience_feature",
+        "coverage_lambda": 0,
+        "beam_search": {
+            "type": "beam_search",
+            "beam_size": 10,
+            "top_p": 1.0,
+            "hyp_sampling": "greedy"
+        },
+        "is_result_rouge_ranked": true,
+        "decoder": {
+            "attention": {
+                "bidirectional": true,
+                "hidden_size": 512
+            },
+            "hidden_size": 512,
+            "input_size": 128,
+            "is_emb_attention": false
+        },
+        "encoder": {
+            "bidirectional": true,
+            "hidden_size": 512,
+            "input_size": 128,
+            "num_layers": 1
+        },
+        "max_steps": 100,
+        "source_embedder": {
+            "token_embedders": {
+                "tokens": {
+                    "type": "embedding",
+                    "embedding_dim": 128,
+                    "trainable": true
+                }
+            }
+        },
+        "target_embedder": {
+            "token_embedders": {
+                "tokens": {
+                    "type": "embedding",
+                    "embedding_dim": 128,
+                    "trainable": true
+                }
+            }
+        },
+        "teacher_force_ratio": 0.7
+    },
+    "train_data_path": "/data/acp16hh/data/bbc/ready/train.salience.tsv",
+    "validation_data_path": "/data/acp16hh/data/bbc/ready/validation.salience.tsv",
+    "trainer": {
+        "cuda_device": 0,
+        "grad_norm": 2,
+        "histogram_interval": 1000,
+        "num_epochs": 30,
+        "num_serialized_models_to_keep": 5,
+        "optimizer": {
+            "type": "adagrad",
+            "initial_accumulator_value": 0.1,
+            "lr": 0.15
+        },
+        "patience": 5,
+        "summary_interval": 1000
+    },
+    "vocabulary": {
+        "max_vocab_size": 50000
+    }
+}
