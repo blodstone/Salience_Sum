@@ -394,9 +394,9 @@ class BeamSearch(CommonBeamSearch):
                                                                                  scores_accumulated,
                                                                                  lengths)
 
-            inactive, best_word_indices, scores_accumulated = self.prune_hyp.forward(best_word_indices,
-                                                                                     scores_accumulated,
-                                                                                     finished)
+            # inactive, best_word_indices, scores_accumulated = self.prune_hyp.forward(best_word_indices,
+            #                                                                          scores_accumulated,
+            #                                                                          finished)
             # Replace unknown with attention
             attention = state['attention']
             best_word_indices = best_word_indices.reshape((batch_size, -1))
@@ -407,8 +407,8 @@ class BeamSearch(CommonBeamSearch):
                         best_word_indices[i][j] = top_idx.squeeze()[i][j]
             best_word_indices = best_word_indices.reshape((-1, ))
 
-            best_hyp_indices_list.append(best_hyp_indices)
-            best_word_indices_list.append(best_word_indices)
+            best_hyp_indices_list.append(best_hyp_indices.clone())
+            best_word_indices_list.append(best_word_indices.clone())
             if finished.sum().item() == batch_size * self.beam_size:
                 break
         folded_accumulated_scores = scores_accumulated.reshape((batch_size,
