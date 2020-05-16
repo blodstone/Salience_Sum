@@ -19,38 +19,11 @@ class WhitespaceTokenizer(object):
         return Doc(self.vocab, words=words, spaces=spaces)
 
 
-def subset_sum(a: List, k: float):
-    k = int(k)
-    if len(a) == 0:
+def is_filter(text):
+    if text.is_stop or text.is_punct:
+        return True
+    else:
         return False
-
-    n = len(a)
-    m = {}
-    for i in range(n + 1):
-        m[i] = {}
-        for k in range(k + 1):
-            m[i][k] = False
-
-    for i in range(1, n + 1):
-        for s in range(k + 1):
-            if s - a[i - 1][1] >= 0:
-                m[i][s] = m[i - 1][s] or a[i - 1][1] == s or m[i - 1][s - a[i - 1][1]]
-            else:
-                m[i][s] = m[i - 1][s] or a[i - 1][1] == s
-
-    searched_set = []
-    i = k
-    j = len(a)
-    while j > 0:
-        if i == 0:
-            break
-        if a[j - 1] != i:
-            while m[j - 1][i]:
-                j -= 1
-        searched_set.append(a[j - 1])
-        i = i - a[j - 1][1]
-        j -= 1
-    return searched_set
 
 
 def extract_phrases(doc_src, doc_tgt, max_len, salience_seqs, k, is_oracle):
@@ -68,7 +41,7 @@ def extract_phrases(doc_src, doc_tgt, max_len, salience_seqs, k, is_oracle):
         score = 0
         phrase_words = []
         for token in chunk:
-            if not token.is_stop and token.i < max_len:
+            if not is_filter(token) and token.i < max_len:
                 phrase_words.append(token.text)
                 phrase_idxs.append(token.i)
                 used_idx_src.append(token.i)
@@ -79,7 +52,7 @@ def extract_phrases(doc_src, doc_tgt, max_len, salience_seqs, k, is_oracle):
             added_words_src.append(phrase_words)
     # (2) Extract single word with stop words and noun chunks removed from text
     for token in doc_src:
-        if not token.is_stop and (token.i not in used_idx_src) and (token.i < max_len):
+        if not is_filter(token) and (token.i not in used_idx_src) and (token.i < max_len):
             if [token.text] not in added_words_src:
                 result.append(([token.i], [token.text], salience_seqs[token.i]))
                 added_words_src.append([token.text])
@@ -89,14 +62,14 @@ def extract_phrases(doc_src, doc_tgt, max_len, salience_seqs, k, is_oracle):
             phrase_idxs = []
             phrase_words = []
             for token in chunk:
-                if not token.is_stop and token.i < max_len:
+                if not is_filter(token) and token.i < max_len:
                     phrase_words.append(token.text)
                     phrase_idxs.append(token.i)
                     used_idx_tgt.append(token.i)
             if len(phrase_idxs) != 0 and phrase_words not in added_words_tgt:
                 added_words_tgt.append(phrase_words)
         for token in doc_tgt:
-            if not token.is_stop and not token.i in used_idx_tgt and token.i < max_len:
+            if not is_filter(token) and not token.i in used_idx_tgt and token.i < max_len:
                 if [token.text] not in added_words_tgt:
                     added_words_tgt.append([token.text])
         new_result = []
