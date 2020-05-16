@@ -144,7 +144,6 @@ def main():
         final_set = extract_phrases(doc_src, doc_tgt, max_len, salience_seqs, k, is_oracle)
 
         if len(final_set) == 0:
-            print(count_empty_final_set)
             count_empty_final_set += 1
         # (4) Format for writing back
         formatted_result = []
@@ -155,6 +154,7 @@ def main():
         updated_lines.append(updated_line)
     (tsv.parent / f'{tsv.name.split(".")[0]}.{output_name}.tsv').open('w') \
         .write('\n'.join(updated_lines))
+    print(f'Total line with empty constraint: {count_empty_final_set}')
 
 
 if __name__ == '__main__':
